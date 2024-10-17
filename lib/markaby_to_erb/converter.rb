@@ -14,19 +14,23 @@ module MarkabyToErb
         puts "Failed to parse the Markaby code. Please check the syntax."
         exit
       end
+
+      #pp sexp
       process_sexp(sexp)
       @buffer.join("\n").encode('UTF-8')
     end
 
     private
 
-    INDENT = '  '
+    INDENT = ' '
 
     def process_sexp(sexp)
-      puts sexp.inspect
+
       return if sexp.nil? || (sexp.is_a?(Array) && sexp.empty?)
 
       type = sexp[0]
+
+      #puts type
       case type
       when :program
         sexp[1].each { |sub_sexp| process_sexp(sub_sexp) }
@@ -49,9 +53,9 @@ module MarkabyToErb
       when :args_add_block
         process_args_add_block(sexp)
       when :@tstring_content
-        add_content(sexp[1])
+        add_content(sexp)
       when :@ident
-        add_line("<%= #{sexp[1]} %>")
+        add_line("<%= #{sexp[1]} %>",:process_sexp)
       else
         puts "Unhandled S-expression type: #{type}"
         puts "Full S-expression: #{sexp.inspect}"
@@ -59,24 +63,29 @@ module MarkabyToErb
     end
 
     def process_method_add_block(sexp)
-      method_call = sexp[1]
-      block = sexp[2]
+      method_call = sexp[1] # Represents the method call part (e.g., `[:method_add_arg, ...]`)
+      block = sexp[2]       # Represents the block part (e.g., `[:do_block, ...]`)
 
-      method_name = extract_method_name(method_call)
+
+      # Extract the method name (e.g., "h4")
+      # method_call[1] is important without the method name was nil
+      method_name = extract_method_name(method_call[1])
+
       if html_tag?(method_name)
-        # Start the tag
-        add_line("<#{method_name}>")
+        # Step 1: Add the opening tag
+        add_line("<#{method_name}>",:process_method_add_block)
 
-        # Process the block content with indentation
+        # Step 2: Process the block content
         if block && block[0] == :do_block
           indent do
-            process_sexp(block[2]) # Process block body
+            process_bodystmt(block[2]) # Extract and process the block body (`:bodystmt`)
           end
         end
 
-        # End the tag
-        add_line("</#{method_name}>")
+        # Step 3: Add the closing tag after processing the block content
+        add_line("</#{method_name}>",:process_method_add_block)
       else
+        # Handle other method calls with blocks that aren't HTML tags
         process_sexp(method_call)
         process_sexp(block) if block
       end
@@ -86,10 +95,12 @@ module MarkabyToErb
       method_call = sexp[1]
       args = sexp[2]
 
+      #pp sexp
+
       method_name = extract_method_name(method_call)
       if html_tag?(method_name)
         # Start the tag
-        add_line("<#{method_name}>")
+        add_line("<#{method_name}>",:process_method_add_arg)
 
         # Add content for the arguments with indentation
         if args
@@ -99,7 +110,7 @@ module MarkabyToErb
         end
 
         # End the tag
-        add_line("</#{method_name}>")
+        add_line("</#{method_name}>",:process_method_add_arg)
       else
         process_sexp(method_call)
         process_sexp(args) if args
@@ -107,15 +118,16 @@ module MarkabyToErb
     end
 
     def process_command(sexp)
-      method_name = sexp[1][1]
-      args = sexp[2]
+      method_name = sexp[1][1] # Extract the command name (e.g., "text")
+      args = sexp[2]           # Extract the arguments
 
       if method_name == 'text'
+        # Extract and add the string content passed to `text`
         content = extract_string(args)
-        add_content(content)
+        add_content(content, :process_command)
       elsif html_tag?(method_name)
         # Start the tag
-        add_line("<#{method_name}>")
+        add_line("<#{method_name}>", :process_command)
 
         # Process arguments (which could be inner content)
         if args
@@ -125,7 +137,7 @@ module MarkabyToErb
         end
 
         # End the tag
-        add_line("</#{method_name}>")
+        add_line("</#{method_name}>", :process_command)
       elsif helper_method?(method_name)
         erb_code = "<%= #{method_name}"
         if args && args[1]
@@ -133,7 +145,7 @@ module MarkabyToErb
           erb_code += " #{arguments}"
         end
         erb_code += " %>"
-        add_line(erb_code)
+        add_content(erb_code, :process_command)
       else
         process_helper_method(method_name, args)
       end
@@ -141,7 +153,7 @@ module MarkabyToErb
 
     def process_string_literal(sexp)
       content = sexp[1][1][1] rescue ''
-      add_content(content)
+      add_content(content, :process_string_literal)
     end
 
     def process_do_block(sexp)
@@ -150,7 +162,7 @@ module MarkabyToErb
     end
 
     def process_bodystmt(sexp)
-      body = sexp[1]
+      body = sexp[1] # `sexp[1]` contains the statements inside the block
       body.each { |sub_sexp| process_sexp(sub_sexp) } if body
     end
 
@@ -200,14 +212,14 @@ module MarkabyToErb
       %w[html head title body h1 h2 h3 h4 h5 h6 ul li a div span p table tr td th form input label select option textarea button].include?(method_name)
     end
 
-    def add_line(line)
+    def add_line(line, parent)
       @buffer << (INDENT * @indent_level) + line
-      puts "Adding line: #{line}" # For debugging purposes
+      #puts "Adding line: #{line} from #{parent}" # For debugging purposes
     end
 
-    def add_content(content)
+    def add_content(content, parent)
       @buffer << (INDENT * (@indent_level + 1)) + content
-      puts "Adding content: #{content}" # For debugging purposes
+      #puts "Adding content: #{content} from #{parent}" # For debugging purposes
     end
 
     def indent
