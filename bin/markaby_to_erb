@@ -1,0 +1,62 @@
+#!/usr/bin/env ruby
+
+# Add the lib directory to the load path
+$LOAD_PATH.unshift(File.expand_path('../../lib', __FILE__))
+
+require 'optparse'
+require 'markaby_to_erb'
+
+options = {}
+OptionParser.new do |opts|
+  opts.banner = "Usage: markaby_to_erb -i INPUT_FILE [-o OUTPUT_FILE]"
+
+  opts.on("-i", "--input FILE", "Input Markaby file") do |file|
+    options[:input] = file
+  end
+
+  opts.on("-o", "--output FILE", "Output ERB file (optional)") do |file|
+    options[:output] = file
+  end
+end.parse!
+
+if options[:input].nil?
+  puts "Input file is required."
+  puts "Usage: markaby_to_erb -i INPUT_FILE [-o OUTPUT_FILE]"
+  exit
+end
+
+input_file = options[:input]
+
+# If output file is not supplied, generate it from input file
+unless options[:output]
+  input_dir = File.dirname(input_file)
+  input_basename = File.basename(input_file, File.extname(input_file)) # filename without extension
+  input_ext = File.extname(input_file)
+
+  # Change .mab or .markaby to .html.erb
+  if ['.mab', '.markaby'].include?(input_ext)
+    output_filename = input_basename + '.html.erb'
+  else
+    output_filename = input_basename + input_ext + '.html.erb'
+  end
+
+  options[:output] = File.join(input_dir, output_filename)
+end
+
+begin
+  markaby_code = File.read(input_file)
+rescue Errno::ENOENT
+  puts "Input file not found: #{input_file}"
+  exit
+end
+
+converter = MarkabyToErb::Converter.new(markaby_code)
+erb_code = converter.convert
+
+begin
+  File.write(options[:output], erb_code)
+  puts "Conversion complete: #{options[:output]}"
+rescue Errno::EACCES
+  puts "Permission denied: Unable to write to #{options[:output]}"
+  exit
+end

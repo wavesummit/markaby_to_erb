@@ -1,0 +1,13 @@
+html do
+  head do
+    title "My Page"
+  end
+  body do
+    h1 "Welcome"
+    ul do
+      @items.each do |item|
+        li item.name
+      end
+    end
+  end
+end
