@@ -41,7 +41,7 @@ RSpec.describe MarkabyToErb::Converter do
       MARKABY
 
       expected_erb = <<~ERB.strip
-        <meta charset="utf-8" />
+        <meta charset="utf-8">
       ERB
 
       converter = MarkabyToErb::Converter.new(markaby_code)
@@ -68,7 +68,7 @@ RSpec.describe MarkabyToErb::Converter do
         <html>
           <head>
             <title>Sample Page</title>
-            <meta charset="utf-8" />
+            <meta charset="utf-8">
           </head>
           <body>
             <h1>Hello, World!</h1>
@@ -146,12 +146,12 @@ RSpec.describe MarkabyToErb::Converter do
           expected_erb = <<~ERB.strip
             <form action="/submit" method="post">
               <%= label "Name:" %>
-              <input type="text" name="username" />
-              <br></br>
+              <input type="text" name="username">
+              <br>
               <%= label "Password:" %>
-              <input type="password" name="password" />
-              <br></br>
-              <input type="submit" value="Login" />
+              <input type="password" name="password">
+              <br>
+              <input type="submit" value="Login">
             </form>
           ERB
 
