@@ -22,7 +22,7 @@ module MarkabyToErb
 
     private
 
-    INDENT = ' '
+    INDENT = '  '
 
     def process_sexp(sexp)
 
@@ -73,17 +73,26 @@ module MarkabyToErb
 
       if html_tag?(method_name)
         # Step 1: Add the opening tag
-        add_line("<#{method_name}>",:process_method_add_block)
+
 
         # Step 2: Process the block content
         if block && block[0] == :do_block
+          add_line("<#{method_name}>",:process_method_add_block)
+
           indent do
             process_bodystmt(block[2]) # Extract and process the block body (`:bodystmt`)
           end
+
+          # Step 3: Add the closing tag after processing the block content
+          add_line("</#{method_name}>",:process_method_add_block)
+
+        else
+          # If there is no block, make it a self-closing tag
+          add_line("<#{method_name} />")
         end
 
         # Step 3: Add the closing tag after processing the block content
-        add_line("</#{method_name}>",:process_method_add_block)
+
       else
         # Handle other method calls with blocks that aren't HTML tags
         process_sexp(method_call)
@@ -99,18 +108,21 @@ module MarkabyToErb
 
       method_name = extract_method_name(method_call)
       if html_tag?(method_name)
-        # Start the tag
-        add_line("<#{method_name}>",:process_method_add_arg)
 
-        # Add content for the arguments with indentation
-        if args
+        if args.nil? || args.empty?
+          add_line("<#{method_name} />",:process_method_add_arg)
+        else
+          # Start the tag
+          add_line("<#{method_name}>",:process_method_add_arg)
+
+          # Add content for the arguments
           indent do
             process_sexp(args)
           end
-        end
 
-        # End the tag
-        add_line("</#{method_name}>",:process_method_add_arg)
+          # End the tag
+          add_line("</#{method_name}>",:process_method_add_arg)
+        end
       else
         process_sexp(method_call)
         process_sexp(args) if args
@@ -126,18 +138,22 @@ module MarkabyToErb
         content = extract_string(args)
         add_content(content, :process_command)
       elsif html_tag?(method_name)
-        # Start the tag
-        add_line("<#{method_name}>", :process_command)
+        attributes = extract_attributes(args)
+        if args.nil? || args[1].empty? || (args[1][0][0] == :bare_assoc_hash && args[1][1].nil? )
+          add_line("<#{method_name}#{attributes} />",:process_command)
+        else
+        # Otherwise, create an opening tag
+          add_line("<#{method_name}#{attributes}>",:process_command)
 
-        # Process arguments (which could be inner content)
-        if args
-          indent do
-            process_sexp(args)
+          # Process the arguments, which could be content inside the tag
+          if args && args[1]
+            indent do
+              process_sexp(args)
+            end
           end
+          # Add closing tag
+          add_line("</#{method_name}>",:process_command)
         end
-
-        # End the tag
-        add_line("</#{method_name}>", :process_command)
       elsif helper_method?(method_name)
         erb_code = "<%= #{method_name}"
         if args && args[1]
@@ -209,7 +225,11 @@ module MarkabyToErb
     end
 
     def html_tag?(method_name)
-      %w[html head title body h1 h2 h3 h4 h5 h6 ul li a div span p table tr td th form input label select option textarea button].include?(method_name)
+      %w[html head title body h1 h2 h3 h4 h5 h6 p div span a ul ol li table tr td th form input
+  button select option textarea img link script meta style header footer section article nav
+  aside main figure figcaption video audio canvas iframe br hr b i u strong em small sub sup
+  code pre blockquote q cite dl dt dd abbr address
+  ].include?(method_name)
     end
 
     def add_line(line, parent)
@@ -218,7 +238,7 @@ module MarkabyToErb
     end
 
     def add_content(content, parent)
-      @buffer << (INDENT * (@indent_level + 1)) + content
+      @buffer << (INDENT * (@indent_level)) + content
       #puts "Adding content: #{content} from #{parent}" # For debugging purposes
     end
 
@@ -233,8 +253,41 @@ module MarkabyToErb
       process_sexp(args) if args
     end
 
+    def extract_attributes(args)
+      return '' unless args && args[1]
+
+      # Check if the arguments contain a `:bare_assoc_hash`
+      bare_assoc_hash = args[1].find { |arg| arg[0] == :bare_assoc_hash }
+      return '' unless bare_assoc_hash
+
+      # Extract key-value pairs from the `:bare_assoc_hash`
+      attribute_pairs = bare_assoc_hash[1]
+      attributes = attribute_pairs.map do |pair|
+        key = pair[1][1].to_s.chomp(':') # Extract key name (remove the colon)
+        value = unparse_sexp(pair[2])     # Extract value using `unparse_sexp`
+        "#{key}=\"#{value}\""
+      end
+
+      attributes.empty? ? '' : " " + attributes.join(' ')
+    end
+
     def extract_arguments(args)
       args.inspect
+    end
+
+    def unparse_sexp(sexp)
+      return '' unless sexp.is_a?(Array)
+
+      type = sexp[0]
+      case type
+      when :string_literal
+        sexp[1][1][1]
+      when :@tstring_content
+        sexp[1]
+      else
+        # Handle other types or return an empty string
+        ''
+      end
     end
   end
 end
