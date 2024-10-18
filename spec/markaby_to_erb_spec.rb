@@ -114,5 +114,79 @@ RSpec.describe MarkabyToErb::Converter do
         expect(erb_code.strip).to eq(expected_erb)
       end
 
+      it 'converts markaby_code' do
+
+        markaby_code = <<~MARKABY
+          label "Name:"
+        MARKABY
+
+        expected_erb = <<~ERB.strip
+        <%= label "Name:" %>
+        ERB
+
+        converter = MarkabyToErb::Converter.new(markaby_code)
+        erb_code = converter.convert
+        expect(erb_code.strip).to eq(expected_erb)
+
+      end
+
+      it 'converts markaby code' do
+          markaby_code = <<~MARKABY
+          form action: "/submit", method: "post" do
+            label "Name:"
+            input type: "text", name: "username"
+            br
+            label "Password:"
+            input type: "password", name: "password"
+            br
+            input type: "submit", value: "Login"
+          end
+          MARKABY
+
+          expected_erb = <<~ERB.strip
+            <form action="/submit" method="post">
+              <%= label "Name:" %>
+              <input type="text" name="username" />
+              <br></br>
+              <%= label "Password:" %>
+              <input type="password" name="password" />
+              <br></br>
+              <input type="submit" value="Login" />
+            </form>
+          ERB
+
+          converter = MarkabyToErb::Converter.new(markaby_code)
+          erb_code = converter.convert
+          expect(erb_code.strip).to eq(expected_erb)
+        end
+
+
+        it 'converts markaby code' do
+            markaby_code = <<~MARKABY
+            greeting = "Welcome to the Site!"
+            html do
+              body do
+                h2 greeting
+                p "This content is dynamically generated with a variable."
+              end
+            end
+            MARKABY
+
+            expected_erb = <<~ERB.strip
+            <% greeting = "Welcome to the Site!" %>
+            <html>
+              <body>
+                <h2><%= greeting %></h2>
+                <p>This content is dynamically generated with a variable.</p>
+              </body>
+            </html>
+
+            ERB
+
+            converter = MarkabyToErb::Converter.new(markaby_code)
+            erb_code = converter.convert
+            expect(erb_code.strip).to eq(expected_erb)
+          end
+
   # Additional test cases
 end
