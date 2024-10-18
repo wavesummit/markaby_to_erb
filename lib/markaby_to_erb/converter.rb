@@ -66,18 +66,18 @@ module MarkabyToErb
       method_call = sexp[1] # Represents the method call part (e.g., `[:method_add_arg, ...]`)
       block = sexp[2]       # Represents the block part (e.g., `[:do_block, ...]`)
 
-
       # Extract the method name (e.g., "h4")
       # method_call[1] is important without the method name was nil
       method_name = extract_method_name(method_call[1])
+      method_name = extract_method_name(method_call) if method_name.nil?
 
       if html_tag?(method_name)
         # Step 1: Add the opening tag
-
+        attributes = extract_attributes(method_call[2])
 
         # Step 2: Process the block content
         if block && block[0] == :do_block
-          add_line("<#{method_name}>",:process_method_add_block)
+          add_line("<#{method_name}#{attributes}>",:process_method_add_block)
 
           indent do
             process_bodystmt(block[2]) # Extract and process the block body (`:bodystmt`)
@@ -88,7 +88,7 @@ module MarkabyToErb
 
         else
           # If there is no block, make it a self-closing tag
-          add_line("<#{method_name} />")
+          add_line("<#{method_name}#{attributes} />")
         end
 
         # Step 3: Add the closing tag after processing the block content
@@ -104,16 +104,14 @@ module MarkabyToErb
       method_call = sexp[1]
       args = sexp[2]
 
-      #pp sexp
-
       method_name = extract_method_name(method_call)
       if html_tag?(method_name)
 
         if args.nil? || args.empty?
-          add_line("<#{method_name} />",:process_method_add_arg)
+          add_line("<#{method_name}#{attributes} />",:process_method_add_arg)
         else
           # Start the tag
-          add_line("<#{method_name}>",:process_method_add_arg)
+          add_line("<#{method_name}#{attributes}>",:process_method_add_arg)
 
           # Add content for the arguments
           indent do
@@ -130,41 +128,42 @@ module MarkabyToErb
     end
 
     def process_command(sexp)
-      method_name = sexp[1][1] # Extract the command name (e.g., "text")
-      args = sexp[2]           # Extract the arguments
+      method_name = sexp[1][1] # Extract method name (e.g., "li" or "text")
+      args = sexp[2]           # Extract arguments (e.g., [:args_add_block, ...])
 
       if method_name == 'text'
-        # Extract and add the string content passed to `text`
-        content = extract_string(args)
-        add_content(content, :process_command)
-      elsif html_tag?(method_name)
-        attributes = extract_attributes(args)
-        if args.nil? || args[1].empty? || (args[1][0][0] == :bare_assoc_hash && args[1][1].nil? )
-          add_line("<#{method_name}#{attributes} />",:process_command)
-        else
-        # Otherwise, create an opening tag
-          add_line("<#{method_name}#{attributes}>",:process_command)
+        # Handle `text` method specifically
+        content = extract_content(args)
+        add_line(content,:process_command)
 
-          # Process the arguments, which could be content inside the tag
-          if args && args[1]
-            indent do
-              process_sexp(args)
-            end
-          end
-          # Add closing tag
-          add_line("</#{method_name}>",:process_command)
-        end
-      elsif helper_method?(method_name)
-        erb_code = "<%= #{method_name}"
-        if args && args[1]
-          arguments = extract_arguments(args)
-          erb_code += " #{arguments}"
-        end
-        erb_code += " %>"
-        add_content(erb_code, :process_command)
-      else
-        process_helper_method(method_name, args)
-      end
+      elsif html_tag?(method_name)
+        # Extract attributes if present
+        attributes = extract_attributes(args)
+
+        # Extract content if it exists in args_add_block
+        content = extract_content(args)
+
+         if content.empty?
+           # If no content, generate an empty tag
+           add_line("<#{method_name}#{attributes} />", :process_command)
+         else
+           # If there is content, generate an opening tag, the content, and a closing tag
+           add_line("<#{method_name}#{attributes}>#{content}</#{method_name}>", :process_command)
+         end
+
+     elsif helper_method?(method_name)
+       erb_code = "<%= #{method_name}"
+       if args && args[1]
+         arguments = extract_arguments(args)
+         erb_code += " #{arguments}"
+       end
+       erb_code += " %>"
+       add_line(erb_code)
+
+     else
+       # Handle other commands or helper methods
+       process_helper_method(method_name, args)
+     end
     end
 
     def process_string_literal(sexp)
@@ -273,6 +272,27 @@ module MarkabyToErb
 
     def extract_arguments(args)
       args.inspect
+    end
+
+    def extract_content(args)
+      return '' unless args && args[1]
+
+      # Extract the first argument if it is a string literal or tstring_content
+      first_arg = args[1][0]
+      if first_arg.is_a?(Array)
+        case first_arg[0]
+        when :string_literal
+          # Extract content from `:string_literal`
+          first_arg[1][1][1]
+        when :@tstring_content
+          # Extract content from `:@tstring_content`
+          first_arg[1]
+        else
+          ''
+        end
+      else
+        ''
+      end
     end
 
     def unparse_sexp(sexp)

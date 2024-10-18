@@ -7,9 +7,7 @@ RSpec.describe MarkabyToErb::Converter do
     MARKABY
 
     expected_erb = <<~ERB.strip
-      <h1>
-        Hello, World!
-      </h1>
+      <h1>Hello, World!</h1>
     ERB
 
     converter = MarkabyToErb::Converter.new(markaby_code)
@@ -69,21 +67,13 @@ RSpec.describe MarkabyToErb::Converter do
       expected_erb = <<~ERB.strip
         <html>
           <head>
-            <title>
-              Sample Page
-            </title>
+            <title>Sample Page</title>
             <meta charset="utf-8" />
           </head>
           <body>
-            <h1>
-              Hello, World!
-            </h1>
-            <p>
-              This is a paragraph in Markaby.
-            </p>
-            <a href="https://example.com">
-              Click here
-            </a>
+            <h1>Hello, World!</h1>
+            <p>This is a paragraph in Markaby.</p>
+            <a href="https://example.com">Click here</a>
           </body>
         </html>
       ERB
@@ -92,6 +82,37 @@ RSpec.describe MarkabyToErb::Converter do
       erb_code = converter.convert
       expect(erb_code.strip).to eq(expected_erb)
     end
+
+
+    it 'converts markaby code' do
+        markaby_code = <<~MARKABY
+        div id: "container" do
+          ul do
+            li "Item 1"
+            li "Item 2", class: "highlighted"
+            li do
+              a "Nested Link", href: "https://example.com"
+            end
+          end
+        end
+        MARKABY
+
+        expected_erb = <<~ERB.strip
+          <div id="container">
+            <ul>
+              <li>Item 1</li>
+              <li class="highlighted">Item 2</li>
+              <li>
+                <a href="https://example.com">Nested Link</a>
+              </li>
+            </ul>
+          </div>
+        ERB
+
+        converter = MarkabyToErb::Converter.new(markaby_code)
+        erb_code = converter.convert
+        expect(erb_code.strip).to eq(expected_erb)
+      end
 
   # Additional test cases
 end
