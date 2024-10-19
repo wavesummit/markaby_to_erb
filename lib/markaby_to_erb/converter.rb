@@ -10,7 +10,7 @@ module MarkabyToErb
 
     def convert
       parser = Parser::CurrentRuby.parse(@markaby_code)
-      pp parser
+      #pp parser
       if parser.nil?
         puts "Failed to parse the Markaby code. Please check the syntax."
         exit
@@ -59,7 +59,6 @@ module MarkabyToErb
       add_line(erb_assignment, :process_assignment)
     end
 
-
     def process_send(node)
       receiver, method_name, *args = node.children
 
@@ -68,6 +67,7 @@ module MarkabyToErb
         erb_code = "<%= #{method_name} #{arguments} %>"
         add_line(erb_code, :process_send)
       elsif html_tag?(method_name)
+
         attributes = extract_attributes(args)
         content = args.reject { |arg| arg.type == :hash }.map { |arg| extract_content(arg) }.join
 
@@ -81,6 +81,7 @@ module MarkabyToErb
           # Add the opening tag and content in the same line if there's no nested block.
           add_line("<#{method_name}#{attributes}>#{content}</#{method_name}>", :process_send)
         end
+
       elsif method_name == :text && args.any?
         # Directly add the text content without ERB tags
         content = args.map { |arg| extract_content(arg) }.join
@@ -101,6 +102,18 @@ module MarkabyToErb
           process_node(body) if body
         end
         add_line("</#{method_name}>", :process_block)
+      elsif iteration_method?(method_name)
+
+        # Handle iteration blocks, e.g., items.each do |item|
+        receiver = method_call.children[0].children.compact.first
+        receiver_args = extract_argument_recursive(args).join(",")
+
+        add_line("<% #{receiver}.#{method_name} do |#{receiver_args}| %>", :process_block)
+        indent do
+          process_node(node.children[2]) if node.children[2]
+        end
+        add_line("<% end %>", :process_block)
+
       else
         process_node(method_call)
         add_line("<% do %>", :process_block)
@@ -121,8 +134,21 @@ module MarkabyToErb
         ":#{node.children[0]}"
       when :lvar
         "<%= #{node.children[0]} %>"
+      when :array
+        # Properly format array elements
+        "[" + node.children.map { |element| "\"#{extract_content(element)}\"" }.join(", ") + "]"
       else
         ""
+      end
+    end
+
+    def extract_argument_recursive(node)
+      return [] if node.nil?
+
+      if node.is_a?(Parser::AST::Node) && node.type == :arg
+        [node.children[0].to_s]
+      else
+        node.children.flat_map { |child| extract_argument_recursive(child) if child.is_a?(Parser::AST::Node) }.compact
       end
     end
 
@@ -142,7 +168,11 @@ module MarkabyToErb
     end
 
     def html_tag?(method_name)
-      %w[html head title body h1 h2 h3 h4 h5 h6 ul li a div span p table tr td th form input label select option textarea button meta br].include?(method_name.to_s)
+      %w[html head title body h1 h2 h3 h4 h5 h6 ul li a div span p table tr td th form input label select option textarea button meta br hr img link].include?(method_name.to_s)
+    end
+
+    def iteration_method?(method_name)
+      %w[each map times each_with_index inject].include?(method_name.to_s)
     end
 
     def self_closing_tag?(method_name)
@@ -155,7 +185,7 @@ module MarkabyToErb
 
     def add_line(line, from_method)
       @buffer << (INDENT * @indent_level) + line
-      puts "Adding line: #{line} from #{from_method}" # For debugging purposes
+      #puts "Adding line: #{line} from #{from_method}" # For debugging purposes
     end
 
     def indent

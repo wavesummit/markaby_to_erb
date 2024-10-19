@@ -190,19 +190,35 @@ RSpec.describe MarkabyToErb::Converter do
 
           it 'converts markaby code' do
               markaby_code = <<~MARKABY
+                  items.each do |i,item|
+                    li item
+                  end
+              MARKABY
+              expected_erb = <<~ERB.strip
+                <% items.each do |i,item| %>
+                  <li><%= item %></li>
+                <% end %>
+              ERB
+
+              converter = MarkabyToErb::Converter.new(markaby_code)
+              erb_code = converter.convert
+              expect(erb_code.strip).to eq(expected_erb)
+            end
+
+          it 'converts markaby code' do
+              markaby_code = <<~MARKABY
                 items = ["Apple", "Banana", "Cherry"]
                   ul do
-                  items.each do |item|
+                  items.each do |i,item|
                     li item
                   end
                 end
               MARKABY
               expected_erb = <<~ERB.strip
               <% items = ["Apple", "Banana", "Cherry"] %>
-
               <ul>
-                <% items.each do |item| %>
-                  <%= li item %>
+                <% items.each do |i,item| %>
+                  <li><%= item %></li>
                 <% end %>
               </ul>
               ERB
