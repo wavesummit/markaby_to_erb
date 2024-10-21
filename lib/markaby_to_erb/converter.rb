@@ -34,6 +34,8 @@ module MarkabyToErb
         process_assignment(node)
       when :block
         process_block(node)
+      when :if, :unless
+       process_if(node, node.type)
       when :begin
         process_begin(node)
       else
@@ -47,7 +49,26 @@ module MarkabyToErb
       end
     end
 
+    def process_if(node, type)
+      condition_node, if_body, else_body = node.children
+
+      add_line("<% #{type} #{extract_content(condition_node)} %>", :process_if)
+      indent do
+        process_node(if_body) if if_body
+      end
+
+      if else_body
+        add_line("<% else %>", :process_if)
+        indent do
+          process_node(else_body)
+        end
+      end
+
+      add_line("<% end %>", :process_if)
+    end
+
     def process_assignment(node)
+
       var_name = node.children[0]
       value_node = node.children[1]
       value = extract_content(value_node)
@@ -67,9 +88,15 @@ module MarkabyToErb
         erb_code = "<%= #{method_name} #{arguments} %>"
         add_line(erb_code, :process_send)
       elsif html_tag?(method_name)
-
         attributes = extract_attributes(args)
-        content = args.reject { |arg| arg.type == :hash }.map { |arg| extract_content(arg) }.join
+        content = args.reject { |arg| arg.type == :hash }.map { |arg|
+          case arg.type
+          when :lvar, :send
+            "<%= #{extract_content(arg)} %>"
+          else
+            extract_content(arg)
+          end
+        }.join
 
         if content.empty?
           if self_closing_tag?(method_name)
@@ -81,13 +108,23 @@ module MarkabyToErb
           # Add the opening tag and content in the same line if there's no nested block.
           add_line("<#{method_name}#{attributes}>#{content}</#{method_name}>", :process_send)
         end
-
       elsif method_name == :text && args.any?
         # Directly add the text content without ERB tags
         content = args.map { |arg| extract_content(arg) }.join
         add_line(content, :process_send)
       else
+        # Handle variable references
         add_line("<%= #{method_name} %>", :process_send)
+      end
+    end
+
+    def process_content_recursively(args)
+      args.each do |arg|
+        if arg.is_a?(Parser::AST::Node) && arg.type == :send
+          process_send(arg)
+        else
+          add_line(extract_content(arg), :process_content_recursively)
+        end
       end
     end
 
@@ -128,15 +165,25 @@ module MarkabyToErb
       return '' if node.nil?
 
       case node.type
+      when :true
+        'true'
+      when :false
+        'false'
       when :str
         node.children[0].to_s
       when :sym
         ":#{node.children[0]}"
       when :lvar
-        "<%= #{node.children[0]} %>"
+        node.children[0].to_s
       when :array
         # Properly format array elements
         "[" + node.children.map { |element| "\"#{extract_content(element)}\"" }.join(", ") + "]"
+      when :send
+        receiver, method_name, *arguments = node.children
+        receiver_str = receiver ? "#{extract_content(receiver)}." : ""
+        arguments_str = arguments.map { |arg| extract_content(arg) }.join(", ")
+        arguments_str = " #{arguments_str}" unless arguments_str.empty?
+        "#{receiver_str}#{method_name}#{arguments_str}"
       else
         ""
       end
