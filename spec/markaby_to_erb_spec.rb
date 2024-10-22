@@ -275,5 +275,67 @@ RSpec.describe MarkabyToErb::Converter do
       expect(erb_code.strip).to eq(expected_erb)
   end
 
+  it 'converts markaby code' do
+      markaby_code = <<~MARKABY
+      table do
+        tr do
+          th "Name"
+          th "Age"
+        end
+        tr do
+          td "Alice"
+          td "30"
+        end
+        tr do
+          td "Bob"
+          td "25"
+        end
+      end
+
+      MARKABY
+      expected_erb = <<~ERB.strip
+      <table>
+        <tr>
+          <th>Name</th>
+          <th>Age</th>
+        </tr>
+        <tr>
+          <td>Alice</td>
+          <td>30</td>
+        </tr>
+        <tr>
+          <td>Bob</td>
+          <td>25</td>
+        </tr>
+      </table>
+      ERB
+
+      converter = MarkabyToErb::Converter.new(markaby_code)
+      erb_code = converter.convert
+      expect(erb_code.strip).to eq(expected_erb)
+  end
+
+
+  it 'converts markaby code' do
+      markaby_code = <<~MARKABY
+      h4 do
+        text "hello jello"
+        text "Associated by credit card (\#{user.name}) "
+        link_to_remote "[+]", :url => {:controller => 'user', :action  => 'assoc_cc_block', :id => user.id}
+      end
+      MARKABY
+      expected_erb = <<~ERB.strip
+      <h4>
+        hello jello
+        <%= "Associated by credit card (\#{user.name}) " %>
+        <%= link_to_remote "[+]", {:url => {:controller => 'user', :action  => 'assoc_cc_block', :id => user.id}} %>
+      </h4>
+      ERB
+
+      converter = MarkabyToErb::Converter.new(markaby_code)
+      erb_code = converter.convert
+      expect(erb_code.strip).to eq(expected_erb)
+  end
+
   # Additional test cases
 end

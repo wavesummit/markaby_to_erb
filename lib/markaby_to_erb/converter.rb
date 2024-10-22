@@ -10,7 +10,6 @@ module MarkabyToErb
 
     def convert
       parser = Parser::CurrentRuby.parse(@markaby_code)
-      #pp parser
       if parser.nil?
         puts "Failed to parse the Markaby code. Please check the syntax."
         exit
@@ -175,6 +174,14 @@ module MarkabyToErb
         ":#{node.children[0]}"
       when :lvar
         node.children[0].to_s
+      when :hash
+        # Handle hashes
+        # can't just to_s on a hash as we need variable names as well as strings for values
+        "{" + node.children.map do |pair|
+          key, value = pair.children
+          hash_val = value.type == :str ?  "'#{extract_content(value)}'" :  extract_content(value)
+          "#{extract_content(key)} => #{hash_val}"
+        end.join(", ") + "}"
       when :array
         # Properly format array elements
         "[" + node.children.map { |element| "\"#{extract_content(element)}\"" }.join(", ") + "]"
@@ -184,6 +191,9 @@ module MarkabyToErb
         arguments_str = arguments.map { |arg| extract_content(arg) }.join(", ")
         arguments_str = " #{arguments_str}" unless arguments_str.empty?
         "#{receiver_str}#{method_name}#{arguments_str}"
+      when :dstr
+        # Handle dynamic strings
+        node.children.map { |child| extract_content(child) }.join
       else
         ""
       end
