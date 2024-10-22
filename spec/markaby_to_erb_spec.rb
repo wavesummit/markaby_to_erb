@@ -333,5 +333,42 @@ RSpec.describe MarkabyToErb::Converter do
       expect(erb_code.strip).to eq(expected_erb)
   end
 
+  it 'converts markaby code' do
+      markaby_code = <<~MARKABY
+       unless x > 10
+          text "Hello"
+        end
+      MARKABY
+
+      expected_erb = <<~ERB.strip
+        <% unless x > 10 %>
+          Hello
+        <% end %>
+      ERB
+
+      converter = MarkabyToErb::Converter.new(markaby_code)
+      erb_code = converter.convert
+      expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+      markaby_code = <<~MARKABY
+        div do
+          span "This content is shown"
+        end unless some_var
+      MARKABY
+
+      expected_erb = <<~ERB.strip
+      <% unless some_var %>
+        <div>
+          <span>This content is shown</span>
+        </div>
+      <% end %>
+      ERB
+      converter = MarkabyToErb::Converter.new(markaby_code)
+      erb_code = converter.convert
+      expect(erb_code.strip).to eq(expected_erb)
+  end
+
   # Additional test cases
 end

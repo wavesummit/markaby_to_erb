@@ -10,6 +10,7 @@ module MarkabyToErb
 
     def convert
       parser = Parser::CurrentRuby.parse(@markaby_code)
+      pp parser if test?
       if parser.nil?
         puts "Failed to parse the Markaby code. Please check the syntax."
         exit
@@ -33,8 +34,8 @@ module MarkabyToErb
         process_assignment(node)
       when :block
         process_block(node)
-      when :if, :unless
-       process_if(node, node.type)
+      when :if
+       process_if(node)
       when :begin
         process_begin(node)
       else
@@ -63,22 +64,58 @@ module MarkabyToErb
       '"' + string_parts.join + '"'
     end
 
-    def process_if(node, type)
+    def process_if(node)
       condition_node, if_body, else_body = node.children
 
-      add_line("<% #{type} #{extract_content(condition_node)} %>", :process_if)
-      indent do
-        process_node(if_body) if if_body
-      end
+      # Check if else_body is an :if node (indicating an elsif)
+      if else_body&.type == :if
+        # Handle if-elsif chain
+        add_line("<% if #{extract_content(condition_node)} %>", :process_if)
+        indent do
+          process_node(if_body) if if_body
+        end
 
-      if else_body
-        add_line("<% else %>", :process_if)
+        # Process all elsif conditions
+        current_node = else_body
+        while current_node&.type == :if
+          condition, body, next_else = current_node.children
+          add_line("<% elsif #{extract_content(condition)} %>", :process_if)
+          indent do
+            process_node(body) if body
+          end
+          current_node = next_else
+        end
+
+        # Handle final else if it exists
+        if current_node
+          add_line("<% else %>", :process_if)
+          indent do
+            process_node(current_node)
+          end
+        end
+
+        add_line("<% end %>", :process_if)
+      elsif if_body.nil? && else_body
+        # Convert to unless when we have nil if_body and non-nil else_body
+        add_line("<% unless #{extract_content(condition_node)} %>", :process_if)
         indent do
           process_node(else_body)
         end
+        add_line("<% end %>", :process_if)
+      else
+        # Handle regular if-else statements
+        add_line("<% if #{extract_content(condition_node)} %>", :process_if)
+        indent do
+          process_node(if_body) if if_body
+        end
+        if else_body
+          add_line("<% else %>", :process_if)
+          indent do
+            process_node(else_body)
+          end
+        end
+        add_line("<% end %>", :process_if)
       end
-
-      add_line("<% end %>", :process_if)
     end
 
     def process_assignment(node)
@@ -193,6 +230,10 @@ module MarkabyToErb
         'false'
       when :str
         node.children[0].to_s
+      when :int
+        node.children[0].to_i
+      when :float
+        node.children[0].to_f
       when :sym
         ":#{node.children[0]}"
       when :lvar
@@ -212,11 +253,7 @@ module MarkabyToErb
         # Properly format array elements
         "[" + node.children.map { |element| "\"#{extract_content(element)}\"" }.join(", ") + "]"
       when :send
-        receiver, method_name, *arguments = node.children
-        receiver_str = receiver ? "#{extract_content(receiver)}." : ""
-        arguments_str = arguments.map { |arg| extract_content(arg) }.join(", ")
-        arguments_str = " #{arguments_str}" unless arguments_str.empty?
-        "#{receiver_str}#{method_name}#{arguments_str}"
+          extract_content_for_send(node)
       when :dstr
         # Handle dynamic strings
         result = node.children.map { |child| extract_content(child) }.join
@@ -224,6 +261,23 @@ module MarkabyToErb
         ""
       end
     end
+
+    def extract_content_for_send(node)
+      receiver, method_name, *arguments = node.children
+
+      # Special handling for comparison operators
+      if [:>, :<, :>=, :<=, :==, :!=].include?(method_name)
+        receiver_str = receiver ? extract_content(receiver) : ""
+        arg_str = arguments.map { |arg| extract_content(arg) }.join
+        return "#{receiver_str} #{method_name} #{arg_str}"
+      end
+
+      # Normal method call processing
+      receiver_str = receiver ? extract_content(receiver) : ""
+      arguments_str = arguments.map { |arg| extract_content(arg) }.join(", ")
+      receiver_str + (receiver_str.empty? ? '' : '.') + "#{method_name}#{arguments_str.empty? ? '' : "(#{arguments_str})"}"
+    end
+
 
     def extract_argument_recursive(node)
       return [] if node.nil?
@@ -268,7 +322,11 @@ module MarkabyToErb
 
     def add_line(line, from_method)
       @buffer << (INDENT * @indent_level) + line
-      #puts "Adding line: #{line} from #{from_method}" # For debugging purposes
+      puts "Adding line: #{line} from #{from_method}" if test?
+    end
+
+    def test?
+      defined?(RSpec)
     end
 
     def indent
