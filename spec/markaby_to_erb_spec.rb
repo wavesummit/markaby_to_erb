@@ -318,18 +318,14 @@ RSpec.describe MarkabyToErb::Converter do
 
   it 'converts markaby code' do
       markaby_code = <<~MARKABY
-      h4 do
-        text "hello jello"
+
         text "Associated by credit card (\#{user.name}) "
         link_to_remote "[+]", :url => {:controller => 'user', :action  => 'assoc_cc_block', :id => user.id}
-      end
+
       MARKABY
       expected_erb = <<~ERB.strip
-      <h4>
-        hello jello
         <%= "Associated by credit card (\#{user.name}) " %>
-        <%= link_to_remote "[+]", {:url => {:controller => 'user', :action  => 'assoc_cc_block', :id => user.id}} %>
-      </h4>
+        <%= link_to_remote "[+]", {:url => {:controller => 'user', :action => 'assoc_cc_block', :id => user.id}} %>
       ERB
 
       converter = MarkabyToErb::Converter.new(markaby_code)

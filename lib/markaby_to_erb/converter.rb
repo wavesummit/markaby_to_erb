@@ -48,6 +48,21 @@ module MarkabyToErb
       end
     end
 
+    def process_dstr(node)
+      string_parts = node.children.map do |child|
+        case child.type
+        when :str
+          child.children[0]
+        when :begin, :evstr
+          "\#{#{extract_content(child.children.first)}}"
+        else
+          # Handle other possible node types if necessary
+          ''
+        end
+      end
+      '"' + string_parts.join + '"'
+    end
+
     def process_if(node, type)
       condition_node, if_body, else_body = node.children
 
@@ -67,9 +82,7 @@ module MarkabyToErb
     end
 
     def process_assignment(node)
-
-      var_name = node.children[0]
-      value_node = node.children[1]
+      var_name, value_node = node.children
       value = extract_content(value_node)
 
       # Ensure strings are properly quoted
@@ -83,9 +96,12 @@ module MarkabyToErb
       receiver, method_name, *args = node.children
 
       if helper_method?(method_name)
-        arguments = args.map { |arg| extract_content(arg).inspect }.join(', ')
+        arguments = args.map do |arg|
+           arg.type == :str ? "\"#{extract_content(arg)}\"" : extract_content(arg)
+        end.join(', ')
         erb_code = "<%= #{method_name} #{arguments} %>"
         add_line(erb_code, :process_send)
+
       elsif html_tag?(method_name)
         attributes = extract_attributes(args)
         content = args.reject { |arg| arg.type == :hash }.map { |arg|
@@ -107,10 +123,18 @@ module MarkabyToErb
           # Add the opening tag and content in the same line if there's no nested block.
           add_line("<#{method_name}#{attributes}>#{content}</#{method_name}>", :process_send)
         end
+
       elsif method_name == :text && args.any?
         # Directly add the text content without ERB tags
-        content = args.map { |arg| extract_content(arg) }.join
-        add_line(content, :process_send)
+        if args.first.type == :dstr
+          # Call process_dstr here to handle dynamic strings
+          content = process_dstr(args.first)
+          add_line("<%= #{content} %>", :process_send)
+        else
+          content = args.map { |arg| extract_content(arg) }.join
+          add_line(content, :process_send)
+        end
+
       else
         # Handle variable references
         add_line("<%= #{method_name} %>", :process_send)
@@ -162,7 +186,6 @@ module MarkabyToErb
 
     def extract_content(node)
       return '' if node.nil?
-
       case node.type
       when :true
         'true'
@@ -174,6 +197,9 @@ module MarkabyToErb
         ":#{node.children[0]}"
       when :lvar
         node.children[0].to_s
+      when :begin
+        #assuming only one child
+        extract_content(node.children[0])
       when :hash
         # Handle hashes
         # can't just to_s on a hash as we need variable names as well as strings for values
@@ -193,7 +219,7 @@ module MarkabyToErb
         "#{receiver_str}#{method_name}#{arguments_str}"
       when :dstr
         # Handle dynamic strings
-        node.children.map { |child| extract_content(child) }.join
+        result = node.children.map { |child| extract_content(child) }.join
       else
         ""
       end
