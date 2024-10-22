@@ -272,6 +272,13 @@ module MarkabyToErb
         return "#{receiver_str} #{method_name} #{arg_str}"
       end
 
+      #deal with params 
+      if receiver && receiver.type == :send && receiver.children[1] == :params && method_name == :[]
+        # If it's params[:key], we generate the correct syntax
+        param_key = arguments[0].type == :str ? ":#{arguments[0].children[0]}" : arguments[0].children[0]
+        return "params[#{param_key}]"
+      end
+
       # Normal method call processing
       receiver_str = receiver ? extract_content(receiver) : ""
       arguments_str = arguments.map { |arg| extract_content(arg) }.join(", ")
@@ -317,7 +324,7 @@ module MarkabyToErb
     end
 
     def helper_method?(method_name)
-      %w[link_to link_to_remote image_tag form_for form_with label].include?(method_name.to_s)
+      %w[link_to link_to_remote image_tag form_for form_remote_tag label].include?(method_name.to_s)
     end
 
     def add_line(line, from_method)

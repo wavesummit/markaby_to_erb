@@ -370,5 +370,28 @@ RSpec.describe MarkabyToErb::Converter do
       expect(erb_code.strip).to eq(expected_erb)
   end
 
+  
+  it 'converts markaby code' do
+      markaby_code = <<~MARKABY
+      form_remote_tag(:url => { :controller => 'user', :action => 'add_command_form', :order_id => params['order_id'], :id => params['id']})
+        label "Hello"
+      end_form
+
+      MARKABY
+
+      expected_erb = <<~ERB.strip
+      <%= form_remote_tag {:url => {:controller => 'user', :action => 'add_command_form', :order_id => params[:order_id], :id => params[:id]}} %>
+      <%= label "Hello" %>
+      <%= end_form %>
+      ERB
+      converter = MarkabyToErb::Converter.new(markaby_code)
+      erb_code = converter.convert
+      expect(erb_code.strip).to eq(expected_erb)
+  end
+
+
+
+
+
   # Additional test cases
 end
