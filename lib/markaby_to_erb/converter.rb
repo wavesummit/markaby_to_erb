@@ -1,4 +1,5 @@
 require 'parser/current'
+require 'pry-byebug'
 
 module MarkabyToErb
   class Converter
@@ -15,6 +16,7 @@ module MarkabyToErb
         puts "Failed to parse the Markaby code. Please check the syntax."
         exit
       end
+
 
       process_node(parser)
       @buffer.join("\n").encode('UTF-8')
@@ -130,6 +132,7 @@ module MarkabyToErb
     end
 
     def process_send(node)
+
       receiver, method_name, *args = node.children
 
       if helper_method?(method_name)
@@ -191,10 +194,12 @@ module MarkabyToErb
     def process_block(node)
       method_call, args, body = node.children
       method_name = method_call.children[1]
-      attributes = extract_attributes(method_call.children.drop(2))
+
 
       if html_tag?(method_name)
+        attributes = extract_attributes(method_call.children.drop(2))
         add_line("<#{method_name}#{attributes}>", :process_block)
+
         indent do
           process_node(body) if body
         end
@@ -234,6 +239,8 @@ module MarkabyToErb
         node.children[0].to_i
       when :float
         node.children[0].to_f
+      when :const
+        node.children[1].to_s
       when :sym
         ":#{node.children[0]}"
       when :lvar
@@ -242,13 +249,10 @@ module MarkabyToErb
         #assuming only one child
         extract_content(node.children[0])
       when :hash
+        #binding.pry
         # Handle hashes
         # can't just to_s on a hash as we need variable names as well as strings for values
-        "{" + node.children.map do |pair|
-          key, value = pair.children
-          hash_val = value.type == :str ?  "'#{extract_content(value)}'" :  extract_content(value)
-          "#{extract_content(key)} => #{hash_val}"
-        end.join(", ") + "}"
+        extract_content_for_hash(node)
       when :array
         # Properly format array elements
         "[" + node.children.map { |element| "\"#{extract_content(element)}\"" }.join(", ") + "]"
@@ -262,6 +266,16 @@ module MarkabyToErb
       end
     end
 
+    def extract_content_for_hash(node)
+      "{" + node.children.map do |pair|
+        key, value = pair.children
+        hash_val = value.type == :str ?  "'#{extract_content(value)}'" :  extract_content(value)
+        key_val =  key.type == :str ?  "'#{extract_content(key)}'" :  extract_content(key)
+        "#{key_val} => #{hash_val}"
+      end.join(", ") + "}"
+    end
+
+
     def extract_content_for_send(node)
       receiver, method_name, *arguments = node.children
 
@@ -272,7 +286,7 @@ module MarkabyToErb
         return "#{receiver_str} #{method_name} #{arg_str}"
       end
 
-      #deal with params 
+      #deal with params
       if receiver && receiver.type == :send && receiver.children[1] == :params && method_name == :[]
         # If it's params[:key], we generate the correct syntax
         param_key = arguments[0].type == :str ? ":#{arguments[0].children[0]}" : arguments[0].children[0]
@@ -324,7 +338,8 @@ module MarkabyToErb
     end
 
     def helper_method?(method_name)
-      %w[link_to link_to_remote image_tag form_for form_remote_tag label].include?(method_name.to_s)
+      helpers = %w[label form_tag form_for form_remote_tag submit_tag label_tag text_field_tag password_field_tag select_tag check_box_tag radio_button_tag file_field_tag link_to link_to_remote button_to url_for image_tag stylesheet_link_tag javascript_include_tag date_select time_select distance_of_time_in_words truncate highlight simple_format sanitize content_tag flash]
+      helpers.include?(method_name.to_s)
     end
 
     def add_line(line, from_method)

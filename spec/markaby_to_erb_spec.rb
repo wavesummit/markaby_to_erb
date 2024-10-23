@@ -370,7 +370,7 @@ RSpec.describe MarkabyToErb::Converter do
       expect(erb_code.strip).to eq(expected_erb)
   end
 
-  
+  #form_remote_tag is replaced with
   it 'converts markaby code' do
       markaby_code = <<~MARKABY
       form_remote_tag(:url => { :controller => 'user', :action => 'add_command_form', :order_id => params['order_id'], :id => params['id']})
@@ -389,6 +389,44 @@ RSpec.describe MarkabyToErb::Converter do
       expect(erb_code.strip).to eq(expected_erb)
   end
 
+  it 'converts markaby code' do
+      markaby_code = <<~MARKABY
+        select_tag 'package', options_for_select('Starter' => STARTER_PACKAGE, 'Basic' => BASIC_PACKAGE, 'Email' => EMAIL_PACKAGE)
+      MARKABY
+
+      expected_erb = <<~ERB.strip
+        <%= select_tag "package", options_for_select({'Starter' => STARTER_PACKAGE, 'Basic' => BASIC_PACKAGE, 'Email' => EMAIL_PACKAGE}) %>
+      ERB
+      converter = MarkabyToErb::Converter.new(markaby_code)
+      erb_code = converter.convert
+      expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+    tooltip = ''
+    total = Money.new
+    completed_transaction.commands.each do |command|
+      tooltip += command.description + ' | ' + command.price.to_s + "\n | "
+      total += command.price
+    end
+    tooltip += 'Total: ' + total.to_s
+    MARKABY
+
+    expected_erb = <<~ERB.strip
+    <% tooltip = "" %>
+    <% total = Money.new %>
+    <% completed_transaction.commands.each do |command| %>
+    <% tooltip += command.description + ' | ' + command.price.to_s + "\n | " %>
+    <% total += command.price %>
+    <% end %>
+    <% tooltip += 'Total: ' + total.to_s %>
+    ERB
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+
+  end
 
 
 
