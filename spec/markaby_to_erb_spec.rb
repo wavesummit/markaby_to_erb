@@ -488,8 +488,19 @@ RSpec.describe MarkabyToErb::Converter do
 
   end
 
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      select_tag 'package', options_for_select('Starter' => STARTER_PACKAGE, 'Basic' => BASIC_PACKAGE, 'Advanced' => PRO_PACKAGE, 'Corporate' => CORPORATE_PACKAGE, 'VIP' => VIP_PACKAGE, 'Email'  => EMAIL_PACKAGE)
+      observe_field("package", :function => "if (value == \#{PRO_PACKAGE}) { BNJQ('#tier').show(); } else {BNJQ('#tier')[0].value = 0; BNJQ('#tier').hide();}")
+    MARKABY
+    expected_erb = <<~ERB.strip
+      <%= select_tag "package", options_for_select({'Starter' => STARTER_PACKAGE, 'Basic' => BASIC_PACKAGE, 'Advanced' => PRO_PACKAGE, 'Corporate' => CORPORATE_PACKAGE, 'VIP' => VIP_PACKAGE, 'Email' => EMAIL_PACKAGE}) %>
+      <%= observe_field "package", {:function => if (value == PRO_PACKAGE) { BNJQ('#tier').show(); } else {BNJQ('#tier')[0].value = 0; BNJQ('#tier').hide();}} %>
+      ERB
 
-
-
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
   # Addxional test cases
 end

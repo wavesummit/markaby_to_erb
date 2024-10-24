@@ -161,17 +161,23 @@ module MarkabyToErb
       end
     end
 
+    def process_method(node)
+      receiver, method_name, *args = node.children
+      arguments = args.map do |arg|
+         arg.type == :str ? "\"#{extract_content(arg)}\"" : extract_content(arg)
+      end.join(', ')
+
+      result = [method_name,arguments].reject { |a| a.empty? }.join(' ')
+      erb_code = "<%= #{result} %>"
+      add_line(erb_code, :process_method)
+    end
+
     def process_send(node)
 
       receiver, method_name, *args = node.children
 
-      if helper_method?(method_name)
-        arguments = args.map do |arg|
-           arg.type == :str ? "\"#{extract_content(arg)}\"" : extract_content(arg)
-        end.join(', ')
-        erb_code = "<%= #{method_name} #{arguments} %>"
-        add_line(erb_code, :process_send)
-
+      if helper_call?(method_name)
+        process_method(node)
       elsif html_tag?(method_name)
         attributes = extract_attributes(args)
         content = args.reject { |arg| arg.type == :hash }.map { |arg|
@@ -205,6 +211,12 @@ module MarkabyToErb
           add_line(content, :process_send)
         end
 
+      elsif method_name == :tag! && args.any?
+
+      elsif method_name == :empty_tag! && args.any?
+        
+      elsif function_call?( node )
+        process_method(node)
       else
         # Handle variable references
         add_line("<%= #{method_name} %>", :process_send)
@@ -418,9 +430,22 @@ module MarkabyToErb
       %w[meta input br hr img link].include?(method_name.to_s)
     end
 
-    def helper_method?(method_name)
+    def helper_call?(method_name)
       helpers = %w[label form_tag form_for form_remote_tag submit_tag label_tag text_field_tag password_field_tag select_tag check_box_tag radio_button_tag file_field_tag link_to link_to_remote button_to url_for image_tag stylesheet_link_tag javascript_include_tag date_select time_select distance_of_time_in_words truncate highlight simple_format sanitize content_tag flash]
       helpers.include?(method_name.to_s)
+    end
+
+    def is_variable?(node)
+      case node.type
+      when :lvar, :ivar, :cvar, :gvar
+        true  # This is a variable
+      else
+        false # Not a variable
+      end
+    end
+
+    def function_call?(node)
+      node.type == :send  # A `send` node represents a function call
     end
 
     def add_line(line, from_method)
