@@ -404,6 +404,66 @@ RSpec.describe MarkabyToErb::Converter do
 
   it 'converts markaby code' do
     markaby_code = <<~MARKABY
+    completed_transaction.commands.each do |command|
+      tooltip = ''
+    end
+    MARKABY
+    expected_erb = <<~ERB.strip
+    <% completed_transaction.commands.each do |command| %>
+      <% tooltip = "" %>
+    <% end %>
+    ERB
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+    tooltip = ''
+    tooltip += 'test'
+    MARKABY
+    expected_erb = <<~ERB.strip
+    <% tooltip = "" %>
+    <% tooltip += "test" %>
+    ERB
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      tooltip = obj.method.method
+      tooltip += obj.method.method
+      tooltip += ( obj.method.method + obj.method.method )
+    MARKABY
+
+    expected_erb = <<~ERB.strip
+      <% tooltip = obj.method.method %>
+      <% tooltip += obj.method.method %>
+      <% tooltip += ( obj.method.method + obj.method.method ) %>
+    ERB
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      tooltip += ( obj.method.method + obj.method.method )
+    MARKABY
+
+    expected_erb = <<~ERB.strip
+      <% tooltip += ( obj.method.method + obj.method.method ) %>
+    ERB
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
     tooltip = ''
     total = Money.new
     completed_transaction.commands.each do |command|
@@ -417,8 +477,8 @@ RSpec.describe MarkabyToErb::Converter do
     <% tooltip = "" %>
     <% total = Money.new %>
     <% completed_transaction.commands.each do |command| %>
-    <% tooltip += command.description + ' | ' + command.price.to_s + "\n | " %>
-    <% total += command.price %>
+      <% tooltip += command.description + ' | ' + command.price.to_s + "\\n | " %>
+      <% total += command.price %>
     <% end %>
     <% tooltip += 'Total: ' + total.to_s %>
     ERB
@@ -431,5 +491,5 @@ RSpec.describe MarkabyToErb::Converter do
 
 
 
-  # Additional test cases
+  # Addxional test cases
 end
