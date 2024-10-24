@@ -473,7 +473,7 @@ module MarkabyToErb
     end
 
     def test?
-      defined?(RSpec)
+      ENV['DEBUG'].to_i == 1
     end
 
     def indent

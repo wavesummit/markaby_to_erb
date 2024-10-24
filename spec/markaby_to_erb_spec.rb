@@ -565,5 +565,4 @@ RSpec.describe MarkabyToErb::Converter do
     expect(erb_code.strip).to eq(expected_erb)
   end
 
-  # Addxional test cases
 end
