@@ -1,4 +1,5 @@
 .git
 .ruby-version
 .ruby-gemset
-.DS_Store 
+.DS_Store
+coverage/

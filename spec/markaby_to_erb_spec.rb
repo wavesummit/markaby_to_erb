@@ -17,7 +17,7 @@ RSpec.describe MarkabyToErb::Converter do
   end
 
   it 'converts markaby code' do
-      markaby_code = <<~MARKABY
+    markaby_code = <<~MARKABY
       h4 do
         text "TADA!"
       end
@@ -35,21 +35,21 @@ RSpec.describe MarkabyToErb::Converter do
   end
 
   it 'converts markaby code' do
-      markaby_code = <<~MARKABY
-        meta charset: "utf-8"
-      MARKABY
+    markaby_code = <<~MARKABY
+      meta charset: "utf-8"
+    MARKABY
 
-      expected_erb = <<~ERB.strip
-        <meta charset="utf-8">
-      ERB
+    expected_erb = <<~ERB.strip
+      <meta charset="utf-8">
+    ERB
 
-      converter = MarkabyToErb::Converter.new(markaby_code)
-      erb_code = converter.convert
-      expect(erb_code.strip).to eq(expected_erb)
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
   end
 
   it 'converts markaby code' do
-      markaby_code = <<~MARKABY
+    markaby_code = <<~MARKABY
       html do
         head do
           title "Sample Page"
@@ -61,29 +61,29 @@ RSpec.describe MarkabyToErb::Converter do
           a "Click here", href: "https://example.com"
         end
       end
-      MARKABY
+    MARKABY
 
-      expected_erb = <<~ERB.strip
-        <html>
-          <head>
-            <title>Sample Page</title>
-            <meta charset="utf-8">
-          </head>
-          <body>
-            <h1>Hello, World!</h1>
-            <p>This is a paragraph in Markaby.</p>
-            <a href="https://example.com">Click here</a>
-          </body>
-        </html>
-      ERB
+    expected_erb = <<~ERB.strip
+      <html>
+        <head>
+          <title>Sample Page</title>
+          <meta charset="utf-8">
+        </head>
+        <body>
+          <h1>Hello, World!</h1>
+          <p>This is a paragraph in Markaby.</p>
+          <a href="https://example.com">Click here</a>
+        </body>
+      </html>
+    ERB
 
-      converter = MarkabyToErb::Converter.new(markaby_code)
-      erb_code = converter.convert
-      expect(erb_code.strip).to eq(expected_erb)
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
   end
 
   it 'converts markaby code' do
-      markaby_code = <<~MARKABY
+    markaby_code = <<~MARKABY
       div id: "container" do
         ul do
           li "Item 1"
@@ -93,43 +93,41 @@ RSpec.describe MarkabyToErb::Converter do
           end
         end
       end
-      MARKABY
-
-      expected_erb = <<~ERB.strip
-        <div id="container">
-          <ul>
-            <li>Item 1</li>
-            <li class="highlighted">Item 2</li>
-            <li>
-              <a href="https://example.com">Nested Link</a>
-            </li>
-          </ul>
-        </div>
-      ERB
-
-      converter = MarkabyToErb::Converter.new(markaby_code)
-      erb_code = converter.convert
-      expect(erb_code.strip).to eq(expected_erb)
-  end
-
-  it 'converts markaby_code' do
-
-    markaby_code = <<~MARKABY
-      label "Name:"
     MARKABY
 
     expected_erb = <<~ERB.strip
-    <%= label "Name:" %>
+      <div id="container">
+        <ul>
+          <li>Item 1</li>
+          <li class="highlighted">Item 2</li>
+          <li>
+            <a href="https://example.com">Nested Link</a>
+          </li>
+        </ul>
+      </div>
     ERB
 
     converter = MarkabyToErb::Converter.new(markaby_code)
     erb_code = converter.convert
     expect(erb_code.strip).to eq(expected_erb)
+  end
 
+  it 'converts markaby_code' do
+    markaby_code = <<~MARKABY
+      label "Name:"
+    MARKABY
+
+    expected_erb = <<~ERB.strip
+      <%= label "Name:" %>
+    ERB
+
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
   end
 
   it 'converts markaby code' do
-      markaby_code = <<~MARKABY
+    markaby_code = <<~MARKABY
       form action: "/submit", method: "post" do
         label "Name:"
         input type: "text", name: "username"
@@ -139,27 +137,27 @@ RSpec.describe MarkabyToErb::Converter do
         br
         input type: "submit", value: "Login"
       end
-      MARKABY
+    MARKABY
 
-      expected_erb = <<~ERB.strip
-        <form action="/submit" method="post">
-          <%= label "Name:" %>
-          <input type="text" name="username">
-          <br>
-          <%= label "Password:" %>
-          <input type="password" name="password">
-          <br>
-          <input type="submit" value="Login">
-        </form>
-      ERB
+    expected_erb = <<~ERB.strip
+      <form action="/submit" method="post">
+        <%= label "Name:" %>
+        <input type="text" name="username">
+        <br>
+        <%= label "Password:" %>
+        <input type="password" name="password">
+        <br>
+        <input type="submit" value="Login">
+      </form>
+    ERB
 
-      converter = MarkabyToErb::Converter.new(markaby_code)
-      erb_code = converter.convert
-      expect(erb_code.strip).to eq(expected_erb)
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
   end
 
   it 'converts markaby code' do
-      markaby_code = <<~MARKABY
+    markaby_code = <<~MARKABY
       greeting = "Welcome to the Site!"
       html do
         body do
@@ -167,9 +165,9 @@ RSpec.describe MarkabyToErb::Converter do
           p "This content is dynamically generated with a variable."
         end
       end
-      MARKABY
+    MARKABY
 
-      expected_erb = <<~ERB.strip
+    expected_erb = <<~ERB.strip
       <% greeting = "Welcome to the Site!" %>
       <html>
         <body>
@@ -178,73 +176,73 @@ RSpec.describe MarkabyToErb::Converter do
         </body>
       </html>
 
-      ERB
+    ERB
 
-      converter = MarkabyToErb::Converter.new(markaby_code)
-      erb_code = converter.convert
-      expect(erb_code.strip).to eq(expected_erb)
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
   end
 
   it 'converts markaby code' do
-      markaby_code = <<~MARKABY
+    markaby_code = <<~MARKABY
       @items.each do |item|
         li item.name
       end
-      MARKABY
+    MARKABY
 
-      expected_erb = <<~ERB.strip
-        <% @items.each do |item| %>
-          <li><%= item.name %></li>
-        <% end %>
-      ERB
+    expected_erb = <<~ERB.strip
+      <% @items.each do |item| %>
+        <li><%= item.name %></li>
+      <% end %>
+    ERB
 
-      converter = MarkabyToErb::Converter.new(markaby_code)
-      erb_code = converter.convert
-      expect(erb_code.strip).to eq(expected_erb)
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
   end
 
   it 'converts markaby code' do
-      markaby_code = <<~MARKABY
-          items.each do |i,item|
-            li item
-          end
-      MARKABY
-      expected_erb = <<~ERB.strip
-        <% items.each do |i,item| %>
-          <li><%= item %></li>
-        <% end %>
-      ERB
+    markaby_code = <<~MARKABY
+      items.each do |i,item|
+        li item
+      end
+    MARKABY
+    expected_erb = <<~ERB.strip
+      <% items.each do |i,item| %>
+        <li><%= item %></li>
+      <% end %>
+    ERB
 
-      converter = MarkabyToErb::Converter.new(markaby_code)
-      erb_code = converter.convert
-      expect(erb_code.strip).to eq(expected_erb)
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
   end
 
   it 'converts markaby code' do
-      markaby_code = <<~MARKABY
-        items = ["Apple", "Banana", "Cherry"]
-          ul do
-          items.each do |i,item|
-            li item
-          end
+    markaby_code = <<~MARKABY
+      items = ["Apple", "Banana", "Cherry"]
+        ul do
+        items.each do |i,item|
+          li item
         end
-      MARKABY
-      expected_erb = <<~ERB.strip
+      end
+    MARKABY
+    expected_erb = <<~ERB.strip
       <% items = ["Apple", "Banana", "Cherry"] %>
       <ul>
         <% items.each do |i,item| %>
           <li><%= item %></li>
         <% end %>
       </ul>
-      ERB
+    ERB
 
-      converter = MarkabyToErb::Converter.new(markaby_code)
-      erb_code = converter.convert
-      expect(erb_code.strip).to eq(expected_erb)
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
   end
 
   it 'converts markaby code' do
-      markaby_code = <<~MARKABY
+    markaby_code = <<~MARKABY
       logged_in = true
       html do
         body do
@@ -256,8 +254,8 @@ RSpec.describe MarkabyToErb::Converter do
         end
       end
 
-      MARKABY
-      expected_erb = <<~ERB.strip
+    MARKABY
+    expected_erb = <<~ERB.strip
       <% logged_in = true %>
       <html>
         <body>
@@ -268,15 +266,15 @@ RSpec.describe MarkabyToErb::Converter do
           <% end %>
         </body>
       </html>
-      ERB
+    ERB
 
-      converter = MarkabyToErb::Converter.new(markaby_code)
-      erb_code = converter.convert
-      expect(erb_code.strip).to eq(expected_erb)
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
   end
 
   it 'converts markaby code' do
-      markaby_code = <<~MARKABY
+    markaby_code = <<~MARKABY
       table do
         tr do
           th "Name"
@@ -292,8 +290,8 @@ RSpec.describe MarkabyToErb::Converter do
         end
       end
 
-      MARKABY
-      expected_erb = <<~ERB.strip
+    MARKABY
+    expected_erb = <<~ERB.strip
       <table>
         <tr>
           <th>Name</th>
@@ -308,110 +306,80 @@ RSpec.describe MarkabyToErb::Converter do
           <td>25</td>
         </tr>
       </table>
-      ERB
+    ERB
 
-      converter = MarkabyToErb::Converter.new(markaby_code)
-      erb_code = converter.convert
-      expect(erb_code.strip).to eq(expected_erb)
-  end
-
-
-  it 'converts markaby code' do
-      markaby_code = <<~MARKABY
-
-        text "Associated by credit card (\#{user.name}) "
-        link_to_remote "[+]", :url => {:controller => 'user', :action  => 'assoc_cc_block', :id => user.id}
-
-      MARKABY
-      expected_erb = <<~ERB.strip
-        <%= "Associated by credit card (\#{user.name}) " %>
-        <%= link_to_remote "[+]", {:url => {:controller => 'user', :action => 'assoc_cc_block', :id => user.id}} %>
-      ERB
-
-      converter = MarkabyToErb::Converter.new(markaby_code)
-      erb_code = converter.convert
-      expect(erb_code.strip).to eq(expected_erb)
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
   end
 
   it 'converts markaby code' do
-      markaby_code = <<~MARKABY
-       unless x > 10
-          text "Hello"
-        end
-      MARKABY
+    markaby_code = <<~MARKABY
 
-      expected_erb = <<~ERB.strip
-        <% unless x > 10 %>
-          Hello
-        <% end %>
-      ERB
+      text "Associated by credit card (\#{user.name}) "
+      link_to_remote "[+]", :url => {:controller => 'user', :action  => 'assoc_cc_block', :id => user.id}
 
-      converter = MarkabyToErb::Converter.new(markaby_code)
-      erb_code = converter.convert
-      expect(erb_code.strip).to eq(expected_erb)
+    MARKABY
+    expected_erb = <<~ERB.strip
+      <%= "Associated by credit card (\#{user.name}) " %>
+      <%= link_to_remote "[+]", {:url => {:controller => 'user', :action => 'assoc_cc_block', :id => user.id}} %>
+    ERB
+
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
   end
 
   it 'converts markaby code' do
-      markaby_code = <<~MARKABY
-        div do
-          span "This content is shown"
-        end unless some_var
-      MARKABY
+    markaby_code = <<~MARKABY
+      unless x > 10
+         text "Hello"
+       end
+    MARKABY
 
-      expected_erb = <<~ERB.strip
+    expected_erb = <<~ERB.strip
+      <% unless x > 10 %>
+        Hello
+      <% end %>
+    ERB
+
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      div do
+        span "This content is shown"
+      end unless some_var
+    MARKABY
+
+    expected_erb = <<~ERB.strip
       <% unless some_var %>
         <div>
           <span>This content is shown</span>
         </div>
       <% end %>
-      ERB
-      converter = MarkabyToErb::Converter.new(markaby_code)
-      erb_code = converter.convert
-      expect(erb_code.strip).to eq(expected_erb)
+    ERB
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
   end
 
-  #form_remote_tag is replaced with
+  # form_remote_tag is replaced with
   it 'converts markaby code' do
-      markaby_code = <<~MARKABY
+    markaby_code = <<~MARKABY
       form_remote_tag(:url => { :controller => 'user', :action => 'add_command_form', :order_id => params['order_id'], :id => params['id']})
         label "Hello"
       end_form
 
-      MARKABY
+    MARKABY
 
-      expected_erb = <<~ERB.strip
+    expected_erb = <<~ERB.strip
       <%= form_remote_tag {:url => {:controller => 'user', :action => 'add_command_form', :order_id => params[:order_id], :id => params[:id]}} %>
       <%= label "Hello" %>
       <%= end_form %>
-      ERB
-      converter = MarkabyToErb::Converter.new(markaby_code)
-      erb_code = converter.convert
-      expect(erb_code.strip).to eq(expected_erb)
-  end
-
-  it 'converts markaby code' do
-      markaby_code = <<~MARKABY
-        select_tag 'package', options_for_select('Starter' => STARTER_PACKAGE, 'Basic' => BASIC_PACKAGE, 'Email' => EMAIL_PACKAGE)
-      MARKABY
-
-      expected_erb = <<~ERB.strip
-        <%= select_tag "package", options_for_select({'Starter' => STARTER_PACKAGE, 'Basic' => BASIC_PACKAGE, 'Email' => EMAIL_PACKAGE}) %>
-      ERB
-      converter = MarkabyToErb::Converter.new(markaby_code)
-      erb_code = converter.convert
-      expect(erb_code.strip).to eq(expected_erb)
-  end
-
-  it 'converts markaby code' do
-    markaby_code = <<~MARKABY
-    completed_transaction.commands.each do |command|
-      tooltip = ''
-    end
-    MARKABY
-    expected_erb = <<~ERB.strip
-    <% completed_transaction.commands.each do |command| %>
-      <% tooltip = "" %>
-    <% end %>
     ERB
     converter = MarkabyToErb::Converter.new(markaby_code)
     erb_code = converter.convert
@@ -420,12 +388,41 @@ RSpec.describe MarkabyToErb::Converter do
 
   it 'converts markaby code' do
     markaby_code = <<~MARKABY
-    tooltip = ''
-    tooltip += 'test'
+      select_tag 'package', options_for_select('Starter' => STARTER_PACKAGE, 'Basic' => BASIC_PACKAGE, 'Email' => EMAIL_PACKAGE)
+    MARKABY
+
+    expected_erb = <<~ERB.strip
+      <%= select_tag "package", options_for_select({'Starter' => STARTER_PACKAGE, 'Basic' => BASIC_PACKAGE, 'Email' => EMAIL_PACKAGE}) %>
+    ERB
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      completed_transaction.commands.each do |command|
+        tooltip = ''
+      end
     MARKABY
     expected_erb = <<~ERB.strip
-    <% tooltip = "" %>
-    <% tooltip += "test" %>
+      <% completed_transaction.commands.each do |command| %>
+        <% tooltip = "" %>
+      <% end %>
+    ERB
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      tooltip = ''
+      tooltip += 'test'
+    MARKABY
+    expected_erb = <<~ERB.strip
+      <% tooltip = "" %>
+      <% tooltip += "test" %>
     ERB
     converter = MarkabyToErb::Converter.new(markaby_code)
     erb_code = converter.convert
@@ -464,28 +461,27 @@ RSpec.describe MarkabyToErb::Converter do
 
   it 'converts markaby code' do
     markaby_code = <<~MARKABY
-    tooltip = ''
-    total = Money.new
-    completed_transaction.commands.each do |command|
-      tooltip += command.description + ' | ' + command.price.to_s + "\n | "
-      total += command.price
-    end
-    tooltip += 'Total: ' + total.to_s
+      tooltip = ''
+      total = Money.new
+      completed_transaction.commands.each do |command|
+        tooltip += command.description + ' | ' + command.price.to_s + "\n | "
+        total += command.price
+      end
+      tooltip += 'Total: ' + total.to_s
     MARKABY
 
     expected_erb = <<~ERB.strip
-    <% tooltip = "" %>
-    <% total = Money.new %>
-    <% completed_transaction.commands.each do |command| %>
-      <% tooltip += command.description + ' | ' + command.price.to_s + "\\n | " %>
-      <% total += command.price %>
-    <% end %>
-    <% tooltip += 'Total: ' + total.to_s %>
+      <% tooltip = "" %>
+      <% total = Money.new %>
+      <% completed_transaction.commands.each do |command| %>
+        <% tooltip += command.description + ' | ' + command.price.to_s + "\\n | " %>
+        <% total += command.price %>
+      <% end %>
+      <% tooltip += 'Total: ' + total.to_s %>
     ERB
     converter = MarkabyToErb::Converter.new(markaby_code)
     erb_code = converter.convert
     expect(erb_code.strip).to eq(expected_erb)
-
   end
 
   it 'converts markaby code' do
@@ -496,7 +492,7 @@ RSpec.describe MarkabyToErb::Converter do
     expected_erb = <<~ERB.strip
       <%= select_tag "package", options_for_select({'Starter' => STARTER_PACKAGE, 'Basic' => BASIC_PACKAGE, 'Advanced' => PRO_PACKAGE, 'Corporate' => CORPORATE_PACKAGE, 'VIP' => VIP_PACKAGE, 'Email' => EMAIL_PACKAGE}) %>
       <%= observe_field "package", {:function => if (value == PRO_PACKAGE) { BNJQ('#tier').show(); } else {BNJQ('#tier')[0].value = 0; BNJQ('#tier').hide();}} %>
-      ERB
+    ERB
 
     converter = MarkabyToErb::Converter.new(markaby_code)
     erb_code = converter.convert
@@ -527,6 +523,42 @@ RSpec.describe MarkabyToErb::Converter do
 
     expected_erb = <<~ERB.strip
       <img src="image.png"/>
+    ERB
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      th do
+        'Type'
+      end
+    MARKABY
+
+    expected_erb = <<~ERB.strip
+      <th>
+        Type
+      </th>
+    ERB
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      th do
+        td { "#\{some_var}" }
+      end
+    MARKABY
+
+    expected_erb = <<~ERB.strip
+      <th>
+        <td>
+          <%= "#\{some_var}" %>
+        </td>
+      </th>
     ERB
     converter = MarkabyToErb::Converter.new(markaby_code)
     erb_code = converter.convert

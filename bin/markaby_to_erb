@@ -1,27 +1,27 @@
 #!/usr/bin/env ruby
 
 # Add the lib directory to the load path
-$LOAD_PATH.unshift(File.expand_path('../../lib', __FILE__))
+$LOAD_PATH.unshift(File.expand_path('../lib', __dir__))
 
 require 'optparse'
 require 'markaby_to_erb'
 
 options = {}
 OptionParser.new do |opts|
-  opts.banner = "Usage: markaby_to_erb -i INPUT_FILE [-o OUTPUT_FILE]"
+  opts.banner = 'Usage: markaby_to_erb -i INPUT_FILE [-o OUTPUT_FILE]'
 
-  opts.on("-i", "--input FILE", "Input Markaby file") do |file|
+  opts.on('-i', '--input FILE', 'Input Markaby file') do |file|
     options[:input] = file
   end
 
-  opts.on("-o", "--output FILE", "Output ERB file (optional)") do |file|
+  opts.on('-o', '--output FILE', 'Output ERB file (optional)') do |file|
     options[:output] = file
   end
 end.parse!
 
 if options[:input].nil?
-  puts "Input file is required."
-  puts "Usage: markaby_to_erb -i INPUT_FILE [-o OUTPUT_FILE]"
+  puts 'Input file is required.'
+  puts 'Usage: markaby_to_erb -i INPUT_FILE [-o OUTPUT_FILE]'
   exit
 end
 
@@ -34,11 +34,11 @@ unless options[:output]
   input_ext = File.extname(input_file)
 
   # Change .mab or .markaby to .html.erb
-  if ['.mab', '.markaby'].include?(input_ext)
-    output_filename = input_basename + '.html.erb'
-  else
-    output_filename = input_basename + input_ext + '.html.erb'
-  end
+  output_filename = if ['.mab', '.markaby'].include?(input_ext)
+                      input_basename + '.html.erb'
+                    else
+                      input_basename + input_ext + '.html.erb'
+                    end
 
   options[:output] = File.join(input_dir, output_filename)
 end

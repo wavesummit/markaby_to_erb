@@ -14,5 +14,4 @@ Gem::Specification.new do |spec|
 
   # Specify the required Ruby version
   spec.required_ruby_version = '>= 2.5.0'
-
 end

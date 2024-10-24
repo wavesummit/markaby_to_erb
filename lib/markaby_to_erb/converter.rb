@@ -1,5 +1,4 @@
 require 'parser/current'
-require 'pry-byebug'
 
 module MarkabyToErb
   class Converter
@@ -13,10 +12,9 @@ module MarkabyToErb
       parser = Parser::CurrentRuby.parse(@markaby_code)
       pp parser if test?
       if parser.nil?
-        puts "Failed to parse the Markaby code. Please check the syntax."
+        puts 'Failed to parse the Markaby code. Please check the syntax.'
         exit
       end
-
 
       process_node(parser)
       @buffer.join("\n").encode('UTF-8')
@@ -37,7 +35,7 @@ module MarkabyToErb
       when :block
         process_block(node)
       when :if
-       process_if(node)
+        process_if(node)
       when :begin
         process_begin(node)
       when :op_asgn
@@ -51,36 +49,36 @@ module MarkabyToErb
       end
     end
 
-  def process_begin(node)
-    node.children.each do |child|
-      process_node(child)
+    def process_begin(node)
+      node.children.each do |child|
+        process_node(child)
+      end
     end
-  end
 
-   def process_op_asgn(node)
-     variable = extract_content(node.children[0])
-     operator = node.children[1]
-     value = extract_content(node.children[2])
+    def process_op_asgn(node)
+      variable = extract_content(node.children[0])
+      operator = node.children[1]
+      value = extract_content(node.children[2])
 
-     # Format the value with parentheses if it's a complex expression
-     formatted_value = node.children[2].type == :begin ? "( #{value} )" : value
-     formatted_value = "\"#{value}\"" if node.children[2].type == :str
+      # Format the value with parentheses if it's a complex expression
+      formatted_value = node.children[2].type == :begin ? "( #{value} )" : value
+      formatted_value = "\"#{value}\"" if node.children[2].type == :str
 
-     # Remove any extra spaces at beginning of lines and fix string concatenation
-     formatted_value = formatted_value.strip
+      # Remove any extra spaces at beginning of lines and fix string concatenation
+      formatted_value = formatted_value.strip
 
-     add_line("<% #{variable} #{operator}= #{formatted_value} %>", :process_op_asgn)
-   end
+      add_line("<% #{variable} #{operator}= #{formatted_value} %>", :process_op_asgn)
+    end
 
-   def process_str(node)
-     value = node.children[0]
-     add_line(value, :process_str)
-   end
+    def process_str(node)
+      value = node.children[0]
+      add_line(value, :process_str)
+    end
 
-   def process_dstr(node)
-     value = extract_dstr(node)
-     add_line("<%= #{value} %>", :process_str)
-   end
+    def process_dstr(node)
+      value = extract_dstr(node)
+      add_line("<%= #{value} %>", :process_str)
+    end
 
     def process_if(node)
       condition_node, if_body, else_body = node.children
@@ -106,20 +104,17 @@ module MarkabyToErb
 
         # Handle final else if it exists
         if current_node
-          add_line("<% else %>", :process_if)
+          add_line('<% else %>', :process_if)
           indent do
             process_node(current_node)
           end
         end
-
-        add_line("<% end %>", :process_if)
       elsif if_body.nil? && else_body
         # Convert to unless when we have nil if_body and non-nil else_body
         add_line("<% unless #{extract_content(condition_node)} %>", :process_if)
         indent do
           process_node(else_body)
         end
-        add_line("<% end %>", :process_if)
       else
         # Handle regular if-else statements
         add_line("<% if #{extract_content(condition_node)} %>", :process_if)
@@ -127,13 +122,13 @@ module MarkabyToErb
           process_node(if_body) if if_body
         end
         if else_body
-          add_line("<% else %>", :process_if)
+          add_line('<% else %>', :process_if)
           indent do
             process_node(else_body)
           end
         end
-        add_line("<% end %>", :process_if)
       end
+      add_line('<% end %>', :process_if)
     end
 
     def process_assignment(node)
@@ -163,30 +158,29 @@ module MarkabyToErb
     def process_method(node)
       receiver, method_name, *args = node.children
       arguments = args.map do |arg|
-         arg.type == :str ? "\"#{extract_content(arg)}\"" : extract_content(arg)
+        arg.type == :str ? "\"#{extract_content(arg)}\"" : extract_content(arg)
       end.join(', ')
 
-      result = [method_name,arguments].reject { |a| a.empty? }.join(' ')
+      result = [method_name, arguments].reject { |a| a.empty? }.join(' ')
       erb_code = "<%= #{result} %>"
       add_line(erb_code, :process_method)
     end
 
     def process_send(node)
-
       receiver, method_name, *args = node.children
 
       if helper_call?(method_name)
         process_method(node)
       elsif html_tag?(method_name)
         attributes = extract_attributes(args)
-        content = args.reject { |arg| arg.type == :hash }.map { |arg|
+        content = args.reject { |arg| arg.type == :hash }.map do |arg|
           case arg.type
           when :lvar, :send
             "<%= #{extract_content(arg)} %>"
           else
             extract_content(arg)
           end
-        }.join
+        end.join
 
         if content.empty?
           if self_closing_tag?(method_name)
@@ -211,11 +205,11 @@ module MarkabyToErb
         end
       elsif method_name == :empty_tag!
 
-        html_tag =  node.children[2].children[0]
+        html_tag = node.children[2].children[0]
         attributes = extract_attributes(node.children.drop(2))
         add_line("<#{html_tag}#{attributes}/>", :process_block)
 
-      elsif function_call?( node )
+      elsif function_call?(node)
         process_method(node)
       else
         # Handle variable references
@@ -237,7 +231,6 @@ module MarkabyToErb
       method_call, args, body = node.children
       method_name = method_call.children[1]
 
-
       if html_tag?(method_name)
         attributes = extract_attributes(method_call.children.drop(2))
         add_line("<#{method_name}#{attributes}>", :process_block)
@@ -251,30 +244,30 @@ module MarkabyToErb
         # Handle iteration blocks, e.g., items.each do |item|
         # Extract the full receiver chain, e.g., object.scope.each
         receiver_chain = extract_receiver_chain(method_call.children[0])
-        receiver_args = extract_argument_recursive(args).join(",")
+        receiver_args = extract_argument_recursive(args).join(',')
 
         add_line("<% #{receiver_chain}.#{method_name} do |#{receiver_args}| %>", :process_block)
 
         indent do
           process_node(node.children[2]) if node.children[2]
         end
-        add_line("<% end %>", :process_block)
+        add_line('<% end %>', :process_block)
 
       elsif method_name == :tag!
-          html_tag =  method_call.children[2].children[0]
-          attributes = extract_attributes(method_call.children.drop(2))
-          add_line("<#{html_tag}#{attributes}>", :process_block)
-          indent do
-            process_node(node.children[2]) if node.children[2]
-          end
-          add_line("</#{html_tag}>", :process_block)
+        html_tag = method_call.children[2].children[0]
+        attributes = extract_attributes(method_call.children.drop(2))
+        add_line("<#{html_tag}#{attributes}>", :process_block)
+        indent do
+          process_node(node.children[2]) if node.children[2]
+        end
+        add_line("</#{html_tag}>", :process_block)
       else
         process_node(method_call)
-        add_line("<% do %>", :process_block)
+        add_line('<% do %>', :process_block)
         indent do
           process_node(body) if body
         end
-        add_line("<% end %>", :process_block)
+        add_line('<% end %>', :process_block)
       end
     end
 
@@ -293,10 +286,9 @@ module MarkabyToErb
       '"' + string_parts.join + '"'
     end
 
-
     def extract_receiver_chain(node)
       if node.nil?
-        return ""
+        ''
       elsif node.type == :send
         # Recursively extract the method chain
         receiver = extract_receiver_chain(node.children[0])
@@ -313,6 +305,7 @@ module MarkabyToErb
 
     def extract_content(node)
       return '' if node.nil?
+
       case node.type
       when :true
         'true'
@@ -339,42 +332,42 @@ module MarkabyToErb
       when :gvar
         "$#{node.children[0]}"
       when :begin
-        #assuming only one child
+        # assuming only one child
         extract_content(node.children[0])
       when :hash
         extract_content_for_hash(node)
       when :array
         # Properly format array elements
-        "[" + node.children.map { |element| "\"#{extract_content(element)}\"" }.join(", ") + "]"
+        '[' + node.children.map { |element| "\"#{extract_content(element)}\"" }.join(', ') + ']'
       when :send
-          extract_content_for_send(node)
+        extract_content_for_send(node)
       when :dstr
         # Handle dynamic strings
-        result = node.children.map { |child| extract_content(child) }.join
+        node.children.map { |child| extract_content(child) }.join
       when :if
-       # Handle `if` statements
-       condition, if_body, else_body = node.children
-       "if #{extract_content(condition)} ? #{extract_content(if_body)} : #{extract_content(else_body)}"
+        # Handle `if` statements
+        condition, if_body, else_body = node.children
+        "if #{extract_content(condition)} ? #{extract_content(if_body)} : #{extract_content(else_body)}"
       else
-        ""
+        ''
       end
     end
 
     def extract_content_for_hash(node)
-      "{" + node.children.map do |pair|
+      '{' + node.children.map do |pair|
         key, value = pair.children
-        hash_val = value.type == :str ?  "'#{extract_content(value)}'" :  extract_content(value)
-        key_val =  key.type == :str ?  "'#{extract_content(key)}'" :  extract_content(key)
+        hash_val = value.type == :str ? "'#{extract_content(value)}'" : extract_content(value)
+        key_val =  key.type == :str ? "'#{extract_content(key)}'" : extract_content(key)
         "#{key_val} => #{hash_val}"
-      end.join(", ") + "}"
+      end.join(', ') + '}'
     end
 
     def extract_content_for_send(node)
       receiver, method_name, *arguments = node.children
 
       # Special handling for comparison operators
-      if [:>, :<, :>=, :<=, :==, :!=].include?(method_name)
-        receiver_str = receiver ? extract_content(receiver) : ""
+      if %i[> < >= <= == !=].include?(method_name)
+        receiver_str = receiver ? extract_content(receiver) : ''
         arg_str = arguments.map { |arg| extract_content(arg) }.join
         return "#{receiver_str} #{method_name} #{arg_str}"
       end
@@ -389,12 +382,12 @@ module MarkabyToErb
       if method_name == :+ && (receiver.type == :str || arguments[0].type == :str || arguments[0].type == :dstr)
         receiver_str = receiver.type == :str ? "'#{extract_content(receiver)}'" : extract_content(receiver)
         arg_str = if arguments[0].type == :str
-          "'#{extract_content(arguments[0]).gsub("\n", "\\n")}'"
-        elsif arguments[0].type == :dstr
-          "\"#{extract_content(arguments[0]).gsub("\n", "\\n")}\""
-        else
-          extract_content(arguments[0])
-        end
+                    "'#{extract_content(arguments[0]).gsub("\n", '\\n')}'"
+                  elsif arguments[0].type == :dstr
+                    "\"#{extract_content(arguments[0]).gsub("\n", '\\n')}\""
+                  else
+                    extract_content(arguments[0])
+                  end
         return "#{receiver_str} + #{arg_str}"
       end
 
@@ -402,12 +395,12 @@ module MarkabyToErb
       if method_name == :+ && receiver && receiver.type == :send
         receiver_str = extract_content(receiver)
         arguments_str = arguments.map { |arg| extract_content(arg) }.join
-        return "#{receiver_str} + #{arguments_str}"  # No parentheses here
+        return "#{receiver_str} + #{arguments_str}" # No parentheses here
       end
 
       # Normal method call processing
-      receiver_str = receiver ? extract_content(receiver) : ""
-      arguments_str = arguments.map { |arg| extract_content(arg) }.join(", ")
+      receiver_str = receiver ? extract_content(receiver) : ''
+      arguments_str = arguments.map { |arg| extract_content(arg) }.join(', ')
 
       # Build the final method call string
       if receiver_str.empty?
@@ -443,7 +436,8 @@ module MarkabyToErb
     end
 
     def html_tag?(method_name)
-      %w[html head title body h1 h2 h3 h4 h5 h6 ul li a div span p table tr td th form input label select option textarea button meta br hr img link].include?(method_name.to_s)
+      %w[html head title body h1 h2 h3 h4 h5 h6 ul li a div span p table tr td th form input label select option
+         textarea button meta br hr img link].include?(method_name.to_s)
     end
 
     def iteration_method?(method_name)
@@ -455,11 +449,12 @@ module MarkabyToErb
     end
 
     def helper_call?(method_name)
-      helpers = %w[label form_tag form_for form_remote_tag submit_tag label_tag text_field_tag password_field_tag select_tag check_box_tag radio_button_tag file_field_tag link_to link_to_remote button_to url_for image_tag stylesheet_link_tag javascript_include_tag date_select time_select distance_of_time_in_words truncate highlight simple_format sanitize content_tag flash]
+      helpers = %w[label form_tag form_for form_remote_tag submit_tag label_tag text_field_tag password_field_tag
+                   select_tag check_box_tag radio_button_tag file_field_tag link_to link_to_remote button_to url_for image_tag stylesheet_link_tag javascript_include_tag date_select time_select distance_of_time_in_words truncate highlight simple_format sanitize content_tag flash]
       helpers.include?(method_name.to_s)
     end
 
-    def is_variable?(node)
+    def variable?(node)
       case node.type
       when :lvar, :ivar, :cvar, :gvar
         true  # This is a variable
