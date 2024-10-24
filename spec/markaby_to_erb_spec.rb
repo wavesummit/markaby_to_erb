@@ -244,10 +244,13 @@ RSpec.describe MarkabyToErb::Converter do
   it 'converts markaby code' do
     markaby_code = <<~MARKABY
       logged_in = true
+      logged_out = false
       html do
         body do
           if logged_in
             p "You are logged in."
+          elsif logged_out
+            p "You have been logged out."
           else
             p "Please log in to continue."
           end
@@ -257,10 +260,13 @@ RSpec.describe MarkabyToErb::Converter do
     MARKABY
     expected_erb = <<~ERB.strip
       <% logged_in = true %>
+      <% logged_out = false %>
       <html>
         <body>
           <% if logged_in %>
             <p>You are logged in.</p>
+          <% elsif logged_out %>
+            <p>You have been logged out.</p>
           <% else %>
             <p>Please log in to continue.</p>
           <% end %>
@@ -565,4 +571,43 @@ RSpec.describe MarkabyToErb::Converter do
     expect(erb_code.strip).to eq(expected_erb)
   end
 
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      div do
+        text @some_var
+      end
+    MARKABY
+    expected_erb = <<~ERB.strip
+      <div>
+        <\%= @some_var %>
+      </div>
+    ERB
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      select_tag 'type', options_for_select(@command_types)
+    MARKABY
+    expected_erb = <<~ERB.strip
+      <%= select_tag "type", options_for_select(@command_types) %>
+    ERB
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      select_tag 'type', options_for_select(@@command_types)
+    MARKABY
+    expected_erb = <<~ERB.strip
+      <%= select_tag "type", options_for_select(@@command_types) %>
+    ERB
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
 end

@@ -22,7 +22,7 @@ module MarkabyToErb
 
     private
 
-    INDENT = '  '
+    INDENT = '  '.freeze
 
     def process_node(node)
       return if node.nil?
@@ -183,6 +183,7 @@ module MarkabyToErb
         end.join
 
         if content.empty?
+          #self closing tags are like br, input
           if self_closing_tag?(method_name)
             add_line("<#{method_name}#{attributes}>", :process_send)
           else
@@ -199,6 +200,10 @@ module MarkabyToErb
           # Call process_dstr here to handle dynamic strings
           content = extract_dstr(args.first)
           add_line("<%= #{content} %>", :process_send)
+        elsif variable?(args.first)
+          # Call process_dstr here to handle dynamic strings
+          content = extract_content(args.first)
+          add_line("<%= #{content} %>", :process_send)
         else
           content = args.map { |arg| extract_content(arg) }.join
           add_line(content, :process_send)
@@ -214,16 +219,6 @@ module MarkabyToErb
       else
         # Handle variable references
         add_line("<%= #{method_name} %>", :process_send)
-      end
-    end
-
-    def process_content_recursively(args)
-      args.each do |arg|
-        if arg.is_a?(Parser::AST::Node) && arg.type == :send
-          process_send(arg)
-        else
-          add_line(extract_content(arg), :process_content_recursively)
-        end
       end
     end
 
@@ -323,14 +318,8 @@ module MarkabyToErb
         ":#{node.children[0]}"
       when :lvasgn
         node.children[0].to_s
-      when :lvar
+      when :lvar,:cvar,:ivar,:gvar
         node.children[0].to_s
-      when :cvar
-        "@@#{node.children[0]}"
-      when :ivar
-        "@#{node.children[0]}"
-      when :gvar
-        "$#{node.children[0]}"
       when :begin
         # assuming only one child
         extract_content(node.children[0])
@@ -436,8 +425,9 @@ module MarkabyToErb
     end
 
     def html_tag?(method_name)
-      %w[html head title body h1 h2 h3 h4 h5 h6 ul li a div span p table tr td th form input label select option
-         textarea button meta br hr img link].include?(method_name.to_s)
+      %w[html head title body h1 h2 h3 h4 h5 h6 ul li a div span p
+        table tr td th form input label select option
+        textarea button meta br hr img link].include?(method_name.to_s)
     end
 
     def iteration_method?(method_name)
@@ -450,7 +440,10 @@ module MarkabyToErb
 
     def helper_call?(method_name)
       helpers = %w[label form_tag form_for form_remote_tag submit_tag label_tag text_field_tag password_field_tag
-                   select_tag check_box_tag radio_button_tag file_field_tag link_to link_to_remote button_to url_for image_tag stylesheet_link_tag javascript_include_tag date_select time_select distance_of_time_in_words truncate highlight simple_format sanitize content_tag flash]
+                   select_tag check_box_tag radio_button_tag file_field_tag link_to link_to_remote button_to
+                   url_for image_tag stylesheet_link_tag javascript_include_tag date_select time_select
+                   distance_of_time_in_words truncate highlight simple_format sanitize content_tag flash]
+
       helpers.include?(method_name.to_s)
     end
 
