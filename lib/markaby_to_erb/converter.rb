@@ -42,18 +42,22 @@ module MarkabyToErb
         process_begin(node)
       when :op_asgn
         process_op_asgn(node)
+      when :str
+        process_str(node)
+      when :dstr
+        process_dstr(node)
       else
         puts "Unhandled node type: #{node.type}"
       end
     end
 
-    def process_begin(node)
-      node.children.each do |child|
-        process_node(child)
-      end
+  def process_begin(node)
+    node.children.each do |child|
+      process_node(child)
     end
+  end
 
-    def process_op_asgn(node)
+   def process_op_asgn(node)
      variable = extract_content(node.children[0])
      operator = node.children[1]
      value = extract_content(node.children[2])
@@ -68,20 +72,15 @@ module MarkabyToErb
      add_line("<% #{variable} #{operator}= #{formatted_value} %>", :process_op_asgn)
    end
 
-    def process_dstr(node)
-      string_parts = node.children.map do |child|
-        case child.type
-        when :str
-          child.children[0]
-        when :begin, :evstr
-          "\#{#{extract_content(child.children.first)}}"
-        else
-          # Handle other possible node types if necessary
-          ''
-        end
-      end
-      '"' + string_parts.join + '"'
-    end
+   def process_str(node)
+     value = node.children[0]
+     add_line(value, :process_str)
+   end
+
+   def process_dstr(node)
+     value = extract_dstr(node)
+     add_line("<%= #{value} %>", :process_str)
+   end
 
     def process_if(node)
       condition_node, if_body, else_body = node.children
@@ -204,7 +203,7 @@ module MarkabyToErb
         # Directly add the text content without ERB tags
         if args.first.type == :dstr
           # Call process_dstr here to handle dynamic strings
-          content = process_dstr(args.first)
+          content = extract_dstr(args.first)
           add_line("<%= #{content} %>", :process_send)
         else
           content = args.map { |arg| extract_content(arg) }.join
@@ -278,6 +277,22 @@ module MarkabyToErb
         add_line("<% end %>", :process_block)
       end
     end
+
+    def extract_dstr(node)
+      string_parts = node.children.map do |child|
+        case child.type
+        when :str
+          child.children[0]
+        when :begin, :evstr
+          "\#{#{extract_content(child.children.first)}}"
+        else
+          # Handle other possible node types if necessary
+          ''
+        end
+      end
+      '"' + string_parts.join + '"'
+    end
+
 
     def extract_receiver_chain(node)
       if node.nil?
