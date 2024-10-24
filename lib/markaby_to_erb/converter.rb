@@ -296,8 +296,6 @@ module MarkabyToErb
         node.children[0].to_s
       when :lvar
         node.children[0].to_s
-      when :lvar
-        node.children[0].to_s
       when :cvar
         "@@#{node.children[0]}"
       when :ivar
