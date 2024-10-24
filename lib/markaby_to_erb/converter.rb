@@ -210,11 +210,12 @@ module MarkabyToErb
           content = args.map { |arg| extract_content(arg) }.join
           add_line(content, :process_send)
         end
+      elsif method_name == :empty_tag!
 
-      elsif method_name == :tag! && args.any?
+        html_tag =  node.children[2].children[0]
+        attributes = extract_attributes(node.children.drop(2))
+        add_line("<#{html_tag}#{attributes}/>", :process_block)
 
-      elsif method_name == :empty_tag! && args.any?
-        
       elsif function_call?( node )
         process_method(node)
       else
@@ -260,6 +261,14 @@ module MarkabyToErb
         end
         add_line("<% end %>", :process_block)
 
+      elsif method_name == :tag!
+          html_tag =  method_call.children[2].children[0]
+          attributes = extract_attributes(method_call.children.drop(2))
+          add_line("<#{html_tag}#{attributes}>", :process_block)
+          indent do
+            process_node(node.children[2]) if node.children[2]
+          end
+          add_line("</#{html_tag}>", :process_block)
       else
         process_node(method_call)
         add_line("<% do %>", :process_block)

@@ -502,5 +502,36 @@ RSpec.describe MarkabyToErb::Converter do
     erb_code = converter.convert
     expect(erb_code.strip).to eq(expected_erb)
   end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      tag!(:my_custom_tag, :class => "custom") do
+        text "Custom content"
+      end
+    MARKABY
+
+    expected_erb = <<~ERB.strip
+      <my_custom_tag class="custom">
+        Custom content
+      </my_custom_tag>
+    ERB
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      empty_tag!(:img, :src => "image.png")
+    MARKABY
+
+    expected_erb = <<~ERB.strip
+      <img src="image.png"/>
+    ERB
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
   # Addxional test cases
 end
