@@ -640,4 +640,180 @@ RSpec.describe MarkabyToErb::Converter do
     erb_code = converter.convert
     expect(erb_code.strip).to eq(expected_erb)
   end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+    table do
+      thead do
+        tr do
+          th { 'Credential' }
+        end
+      end
+
+      tbody.credentials! do
+        render :partial => "listed_credential", :collection => listed_credentials
+      end
+    end
+    MARKABY
+    expected_erb = <<~ERB.strip
+    <table>
+      <thead>
+        <tr>
+          <th>
+            Credential
+          </th>
+        </tr>
+      </thead>
+      <tbody id="credentials">
+        <%= render {:partial => 'listed_credential', :collection => listed_credentials} %>
+      </tbody>
+    </table>
+    ERB
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+    tbody.searchedLogins do
+      render(:partial => 'user', :collection => @results) unless @results.nil?
+    end
+    MARKABY
+    expected_erb = <<~ERB.strip
+    <tbody class="searchedLogins">
+      <% unless @results.nil? %>
+        <%= render {:partial => 'user', :collection => @results} %>
+      <% end %>
+    </tbody>
+    ERB
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+    @event.session.each_pair do |k,v|
+      ul do
+          v.each_pair do |setting, value|
+            li do
+              strong setting.to_s
+              text ": #\{value}"
+            end
+          end
+        end
+    end
+    MARKABY
+
+    expected_erb = <<~ERB.strip
+    <% @event.session.each_pair do |k,v| %>
+      <ul>
+        <% v.each_pair do |setting,value| %>
+          <li>
+            <strong><%= setting.to_s %></strong>
+            <%= ": #\{value}" %>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+
+    ERB
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+    tr :id => "searchResult-#\{marked_user.id}" do
+    render :partial => 'user_row', :locals => {:marked_user => marked_user}
+    end
+    MARKABY
+    expected_erb = <<~ERB.strip
+
+    ERB
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      pagination_links_each(user_pages, { :window_size => 5}) do |number|
+        link_to_remote number.to_s, :url => { :action => 'perma_flagged_users', :page => number }
+      end
+    MARKABY
+    expected_erb = <<~ERB.strip
+
+    ERB
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+    div.userInfo! do
+      yield
+    end
+    MARKABY
+    expected_erb = <<~ERB.strip
+      <div id="userInfo">
+      <%= yield %>
+      </div>
+    ERB
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+    table do
+      tr do
+        td STATUS_TO_READABLE[mail_account.status]
+      end
+    end
+    MARKABY
+    expected_erb = <<~ERB.strip
+
+    ERB
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+    some_var = 1
+    case some_var
+    when 1
+      p 'Hello'
+    when 2
+      p 'Good Bye'
+    else
+      p 'Can I help you'
+    end
+    MARKABY
+
+    expected_erb = <<~ERB.strip
+    <% some_var = 1 %>
+    <% case some_var %>
+    <% when 1 %>
+      <p>Hello</p>
+    <% when 2 %>
+      <p>Good Bye</p>
+    <% when 3 %>
+      <p>Can I help you</p>
+    <% end %>
+    ERB
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
 end

@@ -492,13 +492,14 @@ module MarkabyToErb
     end
 
     def html_tag?(method_name)
-      %w[html head title body h1 h2 h3 h4 h5 h6 ul li a div span p
+      %w[html head title body h1 h2 h3 h4 h5 h6 ul ol li a div span p
         table tr td th form input label select option
-        textarea button meta br hr img link].include?(method_name.to_s)
+        textarea button meta br hr img link tbody thead
+        hgroup i iframe object pre video tfoot dt em fieldset strong].include?(method_name.to_s)
     end
 
     def iteration_method?(method_name)
-      %w[each map times each_with_index inject].include?(method_name.to_s)
+      %w[each map times each_with_index inject each_pair].include?(method_name.to_s)
     end
 
     def self_closing_tag?(method_name)
