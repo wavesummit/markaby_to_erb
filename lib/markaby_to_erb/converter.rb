@@ -168,11 +168,17 @@ module MarkabyToErb
 
     def process_send(node)
       receiver, method_name, *args = node.children
+      html_tag, classes, ids = extract_html_tag_and_attributes(node)
 
       if helper_call?(method_name)
         process_method(node)
-      elsif html_tag?(method_name)
+      elsif html_tag
+        #binding.pry
         attributes = extract_attributes(args)
+
+        attributes = append_classes(attributes, classes)
+        attributes = append_ids(attributes, ids)
+
         content = args.reject { |arg| arg.type == :hash }.map do |arg|
           case arg.type
           when :lvar, :send
@@ -184,14 +190,14 @@ module MarkabyToErb
 
         if content.empty?
           #self closing tags are like br, input
-          if self_closing_tag?(method_name)
-            add_line("<#{method_name}#{attributes}>", :process_send)
+          if self_closing_tag?(html_tag)
+            add_line("<#{html_tag}#{attributes}>", :process_send1)
           else
-            add_line("<#{method_name}#{attributes}/>", :process_send)
+            add_line("<#{html_tag}#{attributes}/>", :process_send)
           end
         else
           # Add the opening tag and content in the same line if there's no nested block.
-          add_line("<#{method_name}#{attributes}>#{content}</#{method_name}>", :process_send)
+          add_line("<#{html_tag}#{attributes}>#{content}</#{html_tag}>", :process_send)
         end
 
       elsif method_name == :text && args.any?
@@ -222,18 +228,45 @@ module MarkabyToErb
       end
     end
 
+    def append_classes(attributes, classes)
+     return attributes if classes.empty?
+
+     if attributes.include?('class="')
+       attributes.sub('class="', "class=\"#{classes.join(' ')} ")
+     else
+       "#{attributes} class=\"#{classes.join(' ')}\""
+     end
+    end
+
+    def append_ids(attributes, ids)
+     return attributes if ids.empty?
+
+     if attributes.include?('id="')
+       attributes.sub('id="', "id=\"#{ids.join(' ')} ")
+     else
+       "#{attributes} id=\"#{ids.join(' ')}\""
+     end
+    end
+
     def process_block(node)
       method_call, args, body = node.children
       method_name = method_call.children[1]
 
-      if html_tag?(method_name)
+      html_tag, classes, ids = extract_html_tag_and_attributes(node.children[0])
+
+
+      if html_tag
         attributes = extract_attributes(method_call.children.drop(2))
-        add_line("<#{method_name}#{attributes}>", :process_block)
+
+        attributes = append_classes(attributes, classes)
+        attributes = append_ids(attributes, ids)
+
+        add_line("<#{html_tag}#{attributes}>", :process_block)
 
         indent do
           process_node(body) if body
         end
-        add_line("</#{method_name}>", :process_block)
+        add_line("</#{html_tag}>", :process_block)
       elsif iteration_method?(method_name)
 
         # Handle iteration blocks, e.g., items.each do |item|
@@ -264,6 +297,40 @@ module MarkabyToErb
         end
         add_line('<% end %>', :process_block)
       end
+    end
+
+    def extract_html_tag_and_attributes(node)
+      return nil unless node.is_a?(Parser::AST::Node)
+      return nil unless node.type == :send
+
+      classes = []
+      ids = []
+      current_node = node
+      base_tag = nil
+
+      # Walk down the chain collecting classes and ids
+      while current_node && current_node.type == :send
+        receiver, method_name, *_args = current_node.children
+
+        if receiver.nil?
+          # We found the base tag (like h1)
+          base_tag = method_name if html_tag?(method_name)
+          break
+        else
+          # If it ends with !, it's an ID, otherwise it's a class
+          if method_name.to_s.end_with?('!')
+            ids.unshift(method_name.to_s.delete('!'))
+          else
+            classes.unshift(method_name)
+          end
+          current_node = receiver
+        end
+      end
+
+      return nil unless base_tag
+
+      # Return the tag and collected attributes
+      [base_tag, classes, ids]
     end
 
     def extract_dstr(node)

@@ -610,4 +610,34 @@ RSpec.describe MarkabyToErb::Converter do
     erb_code = converter.convert
     expect(erb_code.strip).to eq(expected_erb)
   end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      br.break.breaker!
+    MARKABY
+    expected_erb = <<~ERB.strip
+      <br class="break" id="breaker">
+    ERB
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+    div.main.main_container! do
+      h1.head.header! "Welcome"
+      p "This is a sample paragraph."
+    end
+    MARKABY
+    expected_erb = <<~ERB.strip
+    <div class="main" id="main_container">
+      <h1 class="head" id="header">Welcome</h1>
+      <p>This is a sample paragraph.</p>
+    </div>
+    ERB
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
 end

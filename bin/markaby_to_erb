@@ -3,60 +3,184 @@
 # Add the lib directory to the load path
 $LOAD_PATH.unshift(File.expand_path('../lib', __dir__))
 
+#!/usr/bin/env ruby
+
 require 'optparse'
 require 'markaby_to_erb'
+require 'find'
+require 'fileutils'
+
+# Add the lib directory to the load path
+$LOAD_PATH.unshift(File.expand_path('../lib', __dir__))
 
 options = {}
 OptionParser.new do |opts|
-  opts.banner = 'Usage: markaby_to_erb -i INPUT_FILE [-o OUTPUT_FILE]'
+  opts.banner = 'Usage: markaby_to_erb [options]'
 
   opts.on('-i', '--input FILE', 'Input Markaby file') do |file|
     options[:input] = file
   end
 
-  opts.on('-o', '--output FILE', 'Output ERB file (optional)') do |file|
-    options[:output] = file
+  opts.on('-d', '--directory DIR', 'Input directory containing Markaby files') do |dir|
+    options[:directory] = dir
+  end
+
+  opts.on('-o', '--output FILE_OR_DIR', 'Output ERB file or directory (optional)') do |file_or_dir|
+    options[:output] = file_or_dir
+  end
+
+  opts.on('-r', '--rename-old', 'Rename original Markaby file by appending _old to its name') do
+    options[:rename_old] = true
+  end
+
+  opts.on('-h', '--help', 'Displays Help') do
+    puts opts
+    exit
   end
 end.parse!
 
-if options[:input].nil?
-  puts 'Input file is required.'
-  puts 'Usage: markaby_to_erb -i INPUT_FILE [-o OUTPUT_FILE]'
-  exit
+# Validate options
+if options[:input].nil? && options[:directory].nil?
+  puts 'Either input file (-i) or input directory (-d) must be specified.'
+  puts 'Usage: markaby_to_erb [options]'
+  exit 1
 end
 
-input_file = options[:input]
+if options[:input] && options[:directory]
+  puts 'Please specify either an input file (-i) or an input directory (-d), not both.'
+  exit 1
+end
 
-# If output file is not supplied, generate it from input file
-unless options[:output]
+# Method to generate output filename based on input filename
+def generate_output_filename(input_file)
   input_dir = File.dirname(input_file)
   input_basename = File.basename(input_file, File.extname(input_file)) # filename without extension
   input_ext = File.extname(input_file)
 
   # Change .mab or .markaby to .html.erb
-  output_filename = if ['.mab', '.markaby'].include?(input_ext)
-                      input_basename + '.html.erb'
-                    else
-                      input_basename + input_ext + '.html.erb'
-                    end
+  if ['.mab', '.markaby'].include?(input_ext)
+    output_filename = "#{input_basename}.html.erb"
+  else
+    output_filename = "#{input_basename}#{input_ext}.html.erb"
+  end
 
-  options[:output] = File.join(input_dir, output_filename)
+  File.join(input_dir, output_filename)
 end
 
-begin
-  markaby_code = File.read(input_file)
-rescue Errno::ENOENT
-  puts "Input file not found: #{input_file}"
-  exit
+# Method to rename the original file by appending _old before the extension
+def rename_original_file(original_file)
+  dir = File.dirname(original_file)
+  basename = File.basename(original_file, File.extname(original_file))
+  ext = File.extname(original_file)
+  new_name = "#{basename}_old#{ext}.rb"
+  new_path = File.join(dir, new_name)
+
+  if File.exist?(new_path)
+    puts "Cannot rename #{original_file} to #{new_name}: target file already exists."
+    return false
+  end
+
+  begin
+    FileUtils.mv(original_file, new_path)
+    puts "Renamed original file to: #{new_path}"
+    true
+  rescue => e
+    puts "Failed to rename #{original_file} to #{new_name}: #{e.message}"
+    false
+  end
 end
 
-converter = MarkabyToErb::Converter.new(markaby_code)
-erb_code = converter.convert
+# Method to process a single file
+def process_file(input_file, output_file, rename_old)
+  begin
+    markaby_code = File.read(input_file)
+  rescue Errno::ENOENT
+    puts "Input file not found: #{input_file}"
+    return
+  end
 
-begin
-  File.write(options[:output], erb_code)
-  puts "Conversion complete: #{options[:output]}"
-rescue Errno::EACCES
-  puts "Permission denied: Unable to write to #{options[:output]}"
-  exit
+  converter = MarkabyToErb::Converter.new(markaby_code)
+  erb_code = converter.convert
+
+  begin
+    File.write(output_file, erb_code)
+    puts "Conversion complete: #{output_file}"
+  rescue Errno::EACCES
+    puts "Permission denied: Unable to write to #{output_file}"
+    return
+  rescue => e
+    puts "Failed to write to #{output_file}: #{e.message}"
+    return
+  end
+
+  if rename_old
+    rename_original_file(input_file)
+  end
+end
+
+if options[:input]
+  input_file = options[:input]
+
+  # Determine output file
+  output_file = if options[:output]
+                  options[:output]
+                else
+                  generate_output_filename(input_file)
+                end
+
+  process_file(input_file, output_file, options[:rename_old])
+
+elsif options[:directory]
+  input_dir = options[:directory]
+
+  unless Dir.exist?(input_dir)
+    puts "Input directory not found: #{input_dir}"
+    exit 1
+  end
+
+  # Determine output directory
+  output_dir = if options[:output]
+                if Dir.exist?(options[:output])
+                  options[:output]
+                else
+                  begin
+                    FileUtils.mkdir_p(options[:output])
+                    options[:output]
+                  rescue => e
+                    puts "Failed to create output directory: #{options[:output]} (#{e.message})"
+                    exit 1
+                  end
+                end
+              else
+                input_dir
+              end
+
+  # Define the extensions to look for
+  target_extensions = ['.mab', '.markaby']
+
+  # Find all files with target extensions in the input directory
+  Find.find(input_dir) do |path|
+    next unless File.file?(path)
+    ext = File.extname(path).downcase
+    next unless target_extensions.include?(ext)
+
+    relative_path = path.sub(/^#{Regexp.escape(input_dir)}\/?/, '')
+    output_path = File.join(output_dir, relative_path)
+
+    # Change the extension to .html.erb
+    output_path = output_path.sub(/(\.mab|\.markaby)$/i, '.html.erb')
+
+    # Ensure the output directory exists
+    output_file_dir = File.dirname(output_path)
+    unless Dir.exist?(output_file_dir)
+      begin
+        FileUtils.mkdir_p(output_file_dir)
+      rescue => e
+        puts "Failed to create directory #{output_file_dir}: #{e.message}"
+        next
+      end
+    end
+
+    process_file(path, output_path, options[:rename_old])
+  end
 end
