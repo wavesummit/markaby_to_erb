@@ -17,9 +17,9 @@ RSpec.configure do |config|
     args = ARGV.join(' ')
     # Enable debug if running a specific test (either by line number)
     ENV['DEBUG'] = if args.match(/:[\d]+/)
-      '1'
-    else
-      nil
-    end
+                     '1'
+                   else
+                     nil
+                   end
   end
 end

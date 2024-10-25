@@ -173,7 +173,7 @@ module MarkabyToErb
       if helper_call?(method_name)
         process_method(node)
       elsif html_tag
-        #binding.pry
+        # binding.pry
         attributes = extract_attributes(args)
 
         attributes = append_classes(attributes, classes)
@@ -189,7 +189,7 @@ module MarkabyToErb
         end.join
 
         if content.empty?
-          #self closing tags are like br, input
+          # self closing tags are like br, input
           if self_closing_tag?(html_tag)
             add_line("<#{html_tag}#{attributes}>", :process_send1)
           else
@@ -229,23 +229,23 @@ module MarkabyToErb
     end
 
     def append_classes(attributes, classes)
-     return attributes if classes.empty?
+      return attributes if classes.empty?
 
-     if attributes.include?('class="')
-       attributes.sub('class="', "class=\"#{classes.join(' ')} ")
-     else
-       "#{attributes} class=\"#{classes.join(' ')}\""
-     end
+      if attributes.include?('class="')
+        attributes.sub('class="', "class=\"#{classes.join(' ')} ")
+      else
+        "#{attributes} class=\"#{classes.join(' ')}\""
+      end
     end
 
     def append_ids(attributes, ids)
-     return attributes if ids.empty?
+      return attributes if ids.empty?
 
-     if attributes.include?('id="')
-       attributes.sub('id="', "id=\"#{ids.join(' ')} ")
-     else
-       "#{attributes} id=\"#{ids.join(' ')}\""
-     end
+      if attributes.include?('id="')
+        attributes.sub('id="', "id=\"#{ids.join(' ')} ")
+      else
+        "#{attributes} id=\"#{ids.join(' ')}\""
+      end
     end
 
     def process_block(node)
@@ -253,7 +253,6 @@ module MarkabyToErb
       method_name = method_call.children[1]
 
       html_tag, classes, ids = extract_html_tag_and_attributes(node.children[0])
-
 
       if html_tag
         attributes = extract_attributes(method_call.children.drop(2))
@@ -385,7 +384,7 @@ module MarkabyToErb
         ":#{node.children[0]}"
       when :lvasgn
         node.children[0].to_s
-      when :lvar,:cvar,:ivar,:gvar
+      when :lvar, :cvar, :ivar, :gvar
         node.children[0].to_s
       when :begin
         # assuming only one child
@@ -493,9 +492,9 @@ module MarkabyToErb
 
     def html_tag?(method_name)
       %w[html head title body h1 h2 h3 h4 h5 h6 ul ol li a div span p
-        table tr td th form input label select option
-        textarea button meta br hr img link tbody thead
-        hgroup i iframe object pre video tfoot dt em fieldset strong].include?(method_name.to_s)
+         table tr td th form input label select option
+         textarea button meta br hr img link tbody thead
+         hgroup i iframe object pre video tfoot dt em fieldset strong].include?(method_name.to_s)
     end
 
     def iteration_method?(method_name)

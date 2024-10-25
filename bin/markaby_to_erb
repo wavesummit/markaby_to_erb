@@ -3,7 +3,7 @@
 # Add the lib directory to the load path
 $LOAD_PATH.unshift(File.expand_path('../lib', __dir__))
 
-#!/usr/bin/env ruby
+# !/usr/bin/env ruby
 
 require 'optparse'
 require 'markaby_to_erb'
@@ -140,20 +140,20 @@ elsif options[:directory]
 
   # Determine output directory
   output_dir = if options[:output]
-                if Dir.exist?(options[:output])
-                  options[:output]
-                else
-                  begin
-                    FileUtils.mkdir_p(options[:output])
-                    options[:output]
-                  rescue => e
-                    puts "Failed to create output directory: #{options[:output]} (#{e.message})"
-                    exit 1
-                  end
-                end
-              else
-                input_dir
-              end
+                 if Dir.exist?(options[:output])
+                   options[:output]
+                 else
+                   begin
+                     FileUtils.mkdir_p(options[:output])
+                     options[:output]
+                   rescue => e
+                     puts "Failed to create output directory: #{options[:output]} (#{e.message})"
+                     exit 1
+                   end
+                 end
+               else
+                 input_dir
+               end
 
   # Define the extensions to look for
   target_extensions = ['.mab', '.markaby']
@@ -161,6 +161,7 @@ elsif options[:directory]
   # Find all files with target extensions in the input directory
   Find.find(input_dir) do |path|
     next unless File.file?(path)
+
     ext = File.extname(path).downcase
     next unless target_extensions.include?(ext)
 
