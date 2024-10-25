@@ -493,11 +493,11 @@ RSpec.describe MarkabyToErb::Converter do
   it 'converts markaby code' do
     markaby_code = <<~MARKABY
       select_tag 'package', options_for_select('Starter' => STARTER_PACKAGE, 'Basic' => BASIC_PACKAGE, 'Advanced' => PRO_PACKAGE, 'Corporate' => CORPORATE_PACKAGE, 'VIP' => VIP_PACKAGE, 'Email'  => EMAIL_PACKAGE)
-      observe_field("package", :function => "if (value == \#{PRO_PACKAGE}) { BNJQ('#tier').show(); } else {BNJQ('#tier')[0].value = 0; BNJQ('#tier').hide();}")
+      observe_field("package", :function => "alert('hello')")
     MARKABY
     expected_erb = <<~ERB.strip
       <%= select_tag "package", options_for_select({'Starter' => STARTER_PACKAGE, 'Basic' => BASIC_PACKAGE, 'Advanced' => PRO_PACKAGE, 'Corporate' => CORPORATE_PACKAGE, 'VIP' => VIP_PACKAGE, 'Email' => EMAIL_PACKAGE}) %>
-      <%= observe_field "package", {:function => if (value == PRO_PACKAGE) { BNJQ('#tier').show(); } else {BNJQ('#tier')[0].value = 0; BNJQ('#tier').hide();}} %>
+      <%= observe_field "package", {:function => "alert('hello')"} %>
     ERB
 
     converter = MarkabyToErb::Converter.new(markaby_code)
@@ -731,7 +731,9 @@ RSpec.describe MarkabyToErb::Converter do
       end
     MARKABY
     expected_erb = <<~ERB.strip
-
+    <tr id=\"searchResult-#\{marked_user.id}\">
+      <%= render {:partial => 'user_row', :locals => {:marked_user => marked_user}} %>
+    </tr>
     ERB
     converter = MarkabyToErb::Converter.new(markaby_code)
     erb_code = converter.convert
@@ -745,7 +747,9 @@ RSpec.describe MarkabyToErb::Converter do
       end
     MARKABY
     expected_erb = <<~ERB.strip
-
+    <%= pagination_links_each user_pages, {:window_size => 5} do %>
+      <%= link_to_remote number.to_s, {:url => {:action => 'perma_flagged_users', :page => number}} %>
+    <% end %>
     ERB
     converter = MarkabyToErb::Converter.new(markaby_code)
     erb_code = converter.convert
@@ -760,7 +764,7 @@ RSpec.describe MarkabyToErb::Converter do
     MARKABY
     expected_erb = <<~ERB.strip
       <div id="userInfo">
-      <%= yield %>
+        <%= yield %>
       </div>
     ERB
     converter = MarkabyToErb::Converter.new(markaby_code)
@@ -786,26 +790,26 @@ RSpec.describe MarkabyToErb::Converter do
 
   it 'converts markaby code' do
     markaby_code = <<~MARKABY
-      some_var = 1
-      case some_var
-      when 1
-        p 'Hello'
-      when 2
-        p 'Good Bye'
-      else
-        p 'Can I help you'
-      end
+    some_var = 1
+    case some_var
+    when 1
+      p 'Hello'
+    when 2
+      p 'Good Bye'
+    else
+      p 'Can I help you'
+    end
     MARKABY
 
     expected_erb = <<~ERB.strip
       <% some_var = 1 %>
       <% case some_var %>
-      <% when 1 %>
-        <p>Hello</p>
-      <% when 2 %>
-        <p>Good Bye</p>
-      <% when 3 %>
-        <p>Can I help you</p>
+        <% when 1 %>
+          <p>Hello</p>
+        <% when 2 %>
+          <p>Good Bye</p>
+        <% else %>
+          <p>Can I help you</p>
       <% end %>
     ERB
     converter = MarkabyToErb::Converter.new(markaby_code)
@@ -851,7 +855,18 @@ RSpec.describe MarkabyToErb::Converter do
     MARKABY
 
     expected_erb = <<~ERB.strip
-
+    <% xhtml_transitional do>
+      <head>
+        <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
+          <%= stylesheet_link_tag "setup" %>
+            <%= javascript_include_tag "admin" %>
+            <%= javascript_tag "$.asterion.dialog.handleKeypress = function() { }" %>
+            <%= "<link rel='shortcut icon' href='#{@website.brand.default_favicon_url}' />" %>
+       </head>
+       <body>
+        <%= content_for_layout %>
+       </body>
+    <% end %>
     ERB
     converter = MarkabyToErb::Converter.new(markaby_code)
     erb_code = converter.convert

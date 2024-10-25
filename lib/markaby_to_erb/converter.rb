@@ -44,10 +44,19 @@ module MarkabyToErb
         process_str(node)
       when :dstr
         process_dstr(node)
+      when :yield
+        process_yield(node)
+      when :case
+        process_case(node)
       else
         puts "Unhandled node type: #{node.type}"
       end
     end
+
+    def process_yield(node)
+      add_line("<%= yield %>", :process_yield)
+    end
+
 
     def process_begin(node)
       node.children.each do |child|
@@ -166,6 +175,59 @@ module MarkabyToErb
       add_line(erb_code, :process_method)
     end
 
+    def process_case(node)
+      # The first child is the case expression
+      case_expression_node = node.children[0]
+      # The remaining children are the when clauses and possibly an else clause
+      clauses = node.children[1..-1]
+
+      # Extract the case expression content
+      case_expression = extract_content(case_expression_node)
+
+      # Start the case statement in ERB
+      add_line("<% case #{case_expression} %>", :process_case)
+
+      # Increase indentation for the when and else clauses
+      indent do
+        clauses.each do |clause|
+          if clause.type == :when
+            # Handle 'when' clauses
+            # Each 'when' clause can have multiple conditions
+            conditions = clause.children[0..-2] # All but the last child
+            body = clause.children[-1]            # The last child is the body
+
+            # Extract conditions as a comma-separated string
+            condition_str = conditions.map { |cond| extract_content(cond) }.join(', ')
+
+            # Add the 'when' line in ERB
+            add_line("<% when #{condition_str} %>", :process_case)
+
+            # Process the body of the 'when' clause
+            indent do
+              process_node(body)
+            end
+
+          else
+            # Handle 'else' clause
+            # Any clause that's not a 'when' is treated as 'else'
+            body = clause
+
+            # Add the 'else' line in ERB
+            add_line("<% else %>", :process_case)
+
+            # Process the body of the 'else' clause
+            indent do
+              process_node(body)
+            end
+          end
+        end
+      end
+
+      # End the case statement in ERB
+      add_line("<% end %>", :process_case)
+    end
+
+
     def process_send(node)
       receiver, method_name, *args = node.children
       html_tag, classes, ids = extract_html_tag_and_attributes(node)
@@ -173,7 +235,7 @@ module MarkabyToErb
       if helper_call?(method_name)
         process_method(node)
       elsif html_tag
-        # binding.pry
+
         attributes = extract_attributes(args)
 
         attributes = append_classes(attributes, classes)
@@ -397,8 +459,7 @@ module MarkabyToErb
       when :send
         extract_content_for_send(node)
       when :dstr
-        # Handle dynamic strings
-        node.children.map { |child| extract_content(child) }.join
+        extract_content_for_dstr(node)
       when :if
         # Handle `if` statements
         condition, if_body, else_body = node.children
@@ -408,12 +469,39 @@ module MarkabyToErb
       end
     end
 
+    def extract_content_for_dstr(node)
+      #return node.children.map { |child| extract_content(child) }.join
+      # Build the interpolated string, omitting ERB tags
+
+      node.children.map do |child|
+        case child.type
+        when :str
+          child.children[0] # Return static string parts directly
+        when :begin, :evstr
+          "\#{#{extract_content(child.children.first)}}" # Interpolate dynamic parts
+        else
+          ""
+        end
+      end.join
+    end
+
     def extract_content_for_hash(node)
       '{' + node.children.map do |pair|
         key, value = pair.children
-        hash_val = value.type == :str ? "'#{extract_content(value)}'" : extract_content(value)
-        key_val =  key.type == :str ? "'#{extract_content(key)}'" : extract_content(key)
-        "#{key_val} => #{hash_val}"
+
+        # Determine the key's format
+        key_str = key.type == :str ? "'#{extract_content(key)}'" : extract_content(key)
+
+        # Determine if the value contains single quotes and adjust accordingly
+        if value.type == :str
+          content = extract_content(value)
+          # Use double quotes if content contains single quotes
+          hash_val = content.include?("'") ? "\"#{content}\"" : "'#{content}'"
+        else
+          hash_val = extract_content(value)
+        end
+
+        "#{key_str} => #{hash_val}"
       end.join(', ') + '}'
     end
 
@@ -506,7 +594,7 @@ module MarkabyToErb
     end
 
     def helper_call?(method_name)
-      helpers = %w[label form_tag form_for form_remote_tag submit_tag label_tag text_field_tag password_field_tag
+      helpers = %w[observe_field label form_tag form_for form_remote_tag submit_tag label_tag text_field_tag password_field_tag
                    select_tag check_box_tag radio_button_tag file_field_tag link_to link_to_remote button_to
                    url_for image_tag stylesheet_link_tag javascript_include_tag date_select time_select
                    distance_of_time_in_words truncate highlight simple_format sanitize content_tag flash]
