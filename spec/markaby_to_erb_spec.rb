@@ -731,9 +731,9 @@ RSpec.describe MarkabyToErb::Converter do
       end
     MARKABY
     expected_erb = <<~ERB.strip
-    <tr id=\"searchResult-#\{marked_user.id}\">
-      <%= render {:partial => 'user_row', :locals => {:marked_user => marked_user}} %>
-    </tr>
+      <tr id=\"searchResult-#\{marked_user.id}\">
+        <%= render {:partial => 'user_row', :locals => {:marked_user => marked_user}} %>
+      </tr>
     ERB
     converter = MarkabyToErb::Converter.new(markaby_code)
     erb_code = converter.convert
@@ -747,9 +747,9 @@ RSpec.describe MarkabyToErb::Converter do
       end
     MARKABY
     expected_erb = <<~ERB.strip
-    <%= pagination_links_each user_pages, {:window_size => 5} do %>
-      <%= link_to_remote number.to_s, {:url => {:action => 'perma_flagged_users', :page => number}} %>
-    <% end %>
+      <%= pagination_links_each(user_pages, {:window_size => 5}) do %>
+        <%= link_to_remote number.to_s, {:url => {:action => 'perma_flagged_users', :page => number}} %>
+      <% end %>
     ERB
     converter = MarkabyToErb::Converter.new(markaby_code)
     erb_code = converter.convert
@@ -781,7 +781,11 @@ RSpec.describe MarkabyToErb::Converter do
       end
     MARKABY
     expected_erb = <<~ERB.strip
-
+      <table>
+        <tr>
+          <td><%= STATUS_TO_READABLE[mail_account.status] %></td>
+        </tr>
+      </table>
     ERB
     converter = MarkabyToErb::Converter.new(markaby_code)
     erb_code = converter.convert
@@ -790,15 +794,15 @@ RSpec.describe MarkabyToErb::Converter do
 
   it 'converts markaby code' do
     markaby_code = <<~MARKABY
-    some_var = 1
-    case some_var
-    when 1
-      p 'Hello'
-    when 2
-      p 'Good Bye'
-    else
-      p 'Can I help you'
-    end
+      some_var = 1
+      case some_var
+      when 1
+        p 'Hello'
+      when 2
+        p 'Good Bye'
+      else
+        p 'Can I help you'
+      end
     MARKABY
 
     expected_erb = <<~ERB.strip
@@ -819,17 +823,26 @@ RSpec.describe MarkabyToErb::Converter do
 
   it 'converts markaby code' do
     markaby_code = <<~MARKABY
-    content_for(:dialog_size) { 'large' }
-    content_for(:dialog_heading) { t('.manage_categories')}
-    content_for(:dialog_tabs) do
-    dialog_tabs([
-      { :label => t('.blog_posts'), :url => { :controller => '/resource/blog/post', :action => 'manage' } },
-      { :active => true, :label => t('.categories'),:url => { :controller => '/resource/blog/category', :action => 'manage'} }
-    ])
-    end
+      content_for(:dialog_size) { 'large' }
+      content_for(:dialog_heading) { t('.manage_categories')}
+      content_for(:dialog_tabs) do
+      dialog_tabs([
+        { :label => t('.blog_posts'), :url => { :controller => '/resource/blog/post', :action => 'manage' } },
+        { :active => true, :label => t('.categories'),:url => { :controller => '/resource/blog/category', :action => 'manage'} }
+      ])
+      end
     MARKABY
 
     expected_erb = <<~ERB.strip
+      <% content_for :dialog_size, "large" %>
+      <% content_for :dialog_heading, t('.manage_categories') %>
+
+      <% content_for :dialog_tabs do %>
+        <%= dialog_tabs([
+          { label: t('.blog_posts'), url: { controller: '/resource/blog/post', action: 'manage' } },
+          { active: true, label: t('.categories'), url: { controller: '/resource/blog/category', action: 'manage' } }
+        ]) %>
+      <% end %>
 
     ERB
     converter = MarkabyToErb::Converter.new(markaby_code)
@@ -839,38 +852,39 @@ RSpec.describe MarkabyToErb::Converter do
 
   it 'converts markaby code' do
     markaby_code = <<~MARKABY
-    @output_xml_instruction = false
-    xhtml_transitional do
-      head do
-        text '<script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>'
-        stylesheet_link_tag 'setup'
-        javascript_include_tag 'admin'
-        javascript_tag '$.asterion.dialog.handleKeypress = function() { }'
-        text "<link rel='shortcut icon' href='#\{@website.brand.default_favicon_url}' />"
+      @output_xml_instruction = false
+      xhtml_transitional do
+        head do
+          text '<script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>'
+          stylesheet_link_tag 'setup'
+          javascript_include_tag 'admin'
+          javascript_tag '$.asterion.dialog.handleKeypress = function() { }'
+          text "<link rel='shortcut icon' href='#\{@website.brand.default_favicon_url}' />"
+        end
+        body do
+          text content_for_layout
+        end
       end
-      body do
-        text content_for_layout
-      end
-    end
     MARKABY
 
     expected_erb = <<~ERB.strip
-    <% xhtml_transitional do>
-      <head>
-        <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
+      <% @output_xml_instruction = false %>
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
           <%= stylesheet_link_tag "setup" %>
-            <%= javascript_include_tag "admin" %>
-            <%= javascript_tag "$.asterion.dialog.handleKeypress = function() { }" %>
-            <%= "<link rel='shortcut icon' href='#{@website.brand.default_favicon_url}' />" %>
-       </head>
-       <body>
-        <%= content_for_layout %>
-       </body>
-    <% end %>
+          <%= javascript_include_tag "admin" %>
+          <%= javascript_tag "$.asterion.dialog.handleKeypress = function() { }" %>
+          <%= "<link rel='shortcut icon' href='#\{@website.brand.default_favicon_url}' />" %>
+        </head>
+        <body>
+          <%= content_for_layout %>
+        </body>
+      </html>
     ERB
     converter = MarkabyToErb::Converter.new(markaby_code)
     erb_code = converter.convert
     expect(erb_code.strip).to eq(expected_erb)
-    end
-
+  end
 end

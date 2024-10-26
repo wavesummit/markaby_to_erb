@@ -30,7 +30,7 @@ module MarkabyToErb
       case node.type
       when :send
         process_send(node)
-      when :lvasgn
+      when :lvasgn, :ivasgn
         process_assignment(node)
       when :block
         process_block(node)
@@ -56,7 +56,6 @@ module MarkabyToErb
     def process_yield(node)
       add_line("<%= yield %>", :process_yield)
     end
-
 
     def process_begin(node)
       node.children.each do |child|
@@ -142,7 +141,7 @@ module MarkabyToErb
 
     def process_assignment(node)
       case node.type
-      when :lvasgn
+      when :lvasgn, :ivasgn
         var_name, value_node = node.children
 
         # Delegate to process_op_asgn if the value is an operator assignment
@@ -194,7 +193,7 @@ module MarkabyToErb
             # Handle 'when' clauses
             # Each 'when' clause can have multiple conditions
             conditions = clause.children[0..-2] # All but the last child
-            body = clause.children[-1]            # The last child is the body
+            body = clause.children[-1] # The last child is the body
 
             # Extract conditions as a comma-separated string
             condition_str = conditions.map { |cond| extract_content(cond) }.join(', ')
@@ -227,17 +226,20 @@ module MarkabyToErb
       add_line("<% end %>", :process_case)
     end
 
-
     def process_send(node)
       receiver, method_name, *args = node.children
       html_tag, classes, ids = extract_html_tag_and_attributes(node)
+      #  binding.pry
 
       if helper_call?(method_name)
         process_method(node)
+
+      elsif method_name == :content_for
+        process_content_for(node, args)
+
       elsif html_tag
 
         attributes = extract_attributes(args)
-
         attributes = append_classes(attributes, classes)
         attributes = append_ids(attributes, ids)
 
@@ -268,7 +270,7 @@ module MarkabyToErb
           # Call process_dstr here to handle dynamic strings
           content = extract_dstr(args.first)
           add_line("<%= #{content} %>", :process_send)
-        elsif variable?(args.first)
+        elsif variable?(args.first) || function_call?(args.first)
           # Call process_dstr here to handle dynamic strings
           content = extract_content(args.first)
           add_line("<%= #{content} %>", :process_send)
@@ -287,6 +289,23 @@ module MarkabyToErb
       else
         # Handle variable references
         add_line("<%= #{method_name} %>", :process_send)
+      end
+    end
+
+    def process_content_for(method_call, body)
+      content_key = extract_content(method_call.children[2])
+
+      if body.is_a?(Parser::AST::Node) && (body.type == :str)
+        # Single string content, use shorthand syntax
+        content = body.type == :str ? "\"#{extract_content(body)}\"" : extract_content(body)
+        add_line("<% content_for #{content_key}, #{content} %>", :process_content_for)
+      else
+        # Multi-statement block
+        add_line("<% content_for #{content_key} do %>", :process_content_for)
+        indent do
+          process_node(body) if body
+        end
+        add_line("<% end %>", :process_content_for)
       end
     end
 
@@ -328,10 +347,13 @@ module MarkabyToErb
           process_node(body) if body
         end
         add_line("</#{html_tag}>", :process_block)
-      elsif iteration_method?(method_name)
 
+      elsif method_name == :content_for
+
+        process_content_for(method_call, body)
+
+      elsif iteration_method?(method_name)
         # Handle iteration blocks, e.g., items.each do |item|
-        # Extract the full receiver chain, e.g., object.scope.each
         receiver_chain = extract_receiver_chain(method_call.children[0])
         receiver_args = extract_argument_recursive(args).join(',')
 
@@ -342,6 +364,14 @@ module MarkabyToErb
         end
         add_line('<% end %>', :process_block)
 
+      elsif [:xhtml_transitional, :xhtml_strict, :html4_transitional, :html4_strict].include? method_name
+        add_line('<!DOCTYPE html>', :process_block)
+        add_line('<html>', :process_block)
+        indent do
+          process_node(body) if body
+        end
+        add_line('</html>', :process_block)
+
       elsif method_name == :tag!
         html_tag = method_call.children[2].children[0]
         attributes = extract_attributes(method_call.children.drop(2))
@@ -350,9 +380,12 @@ module MarkabyToErb
           process_node(node.children[2]) if node.children[2]
         end
         add_line("</#{html_tag}>", :process_block)
+
       else
-        process_node(method_call)
-        add_line('<% do %>', :process_block)
+        # Combine method call with `do` in one line
+        erb_code = "<%= #{extract_content(method_call)} do %>"
+        add_line(erb_code, :process_block)
+
         indent do
           process_node(body) if body
         end
@@ -470,7 +503,7 @@ module MarkabyToErb
     end
 
     def extract_content_for_dstr(node)
-      #return node.children.map { |child| extract_content(child) }.join
+      # return node.children.map { |child| extract_content(child) }.join
       # Build the interpolated string, omitting ERB tags
 
       node.children.map do |child|
@@ -519,6 +552,13 @@ module MarkabyToErb
       if receiver && receiver.type == :send && receiver.children[1] == :params && method_name == :[]
         param_key = arguments[0].type == :str ? ":#{arguments[0].children[0]}" : arguments[0].children[0]
         return "params[#{param_key}]"
+      end
+
+      # Handle array access (e.g., `STATUS_TO_READABLE[mail_account.status]`)
+      if method_name == :[] && receiver
+        receiver_str = extract_content(receiver)
+        arguments_str = arguments.map { |arg| extract_content(arg) }.join(", ")
+        return "#{receiver_str}[#{arguments_str}]"
       end
 
       # Special handling for string concatenation with +
