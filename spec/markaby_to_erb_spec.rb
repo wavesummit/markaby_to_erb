@@ -826,22 +826,15 @@ RSpec.describe MarkabyToErb::Converter do
       content_for(:dialog_size) { 'large' }
       content_for(:dialog_heading) { t('.manage_categories')}
       content_for(:dialog_tabs) do
-      dialog_tabs([
-        { :label => t('.blog_posts'), :url => { :controller => '/resource/blog/post', :action => 'manage' } },
-        { :active => true, :label => t('.categories'),:url => { :controller => '/resource/blog/category', :action => 'manage'} }
-      ])
+        dialog_tabs [{:label => t('.blog_posts'), :url => { :controller => '/resource/blog/post', :action => 'manage' } },{ :active => true, :label => t('.categories'),:url => { :controller => '/resource/blog/category', :action => 'manage'} }]
       end
     MARKABY
 
     expected_erb = <<~ERB.strip
       <% content_for :dialog_size, "large" %>
       <% content_for :dialog_heading, t('.manage_categories') %>
-
       <% content_for :dialog_tabs do %>
-        <%= dialog_tabs([
-          { label: t('.blog_posts'), url: { controller: '/resource/blog/post', action: 'manage' } },
-          { active: true, label: t('.categories'), url: { controller: '/resource/blog/category', action: 'manage' } }
-        ]) %>
+        <%= dialog_tabs [{:label => t('.blog_posts'), :url => {:controller => '/resource/blog/post', :action => 'manage'}}, {:active => true, :label => t('.categories'), :url => {:controller => '/resource/blog/category', :action => 'manage'}}] %>
       <% end %>
 
     ERB

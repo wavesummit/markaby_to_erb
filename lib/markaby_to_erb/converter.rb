@@ -292,15 +292,47 @@ module MarkabyToErb
       end
     end
 
+    def simple_block?(body)
+      return false unless body.is_a?(Parser::AST::Node) &&
+                          body.type == :block &&
+                          body.children[2] &&
+                          body.children[2].children.length == 1
+
+      # Get the actual content node (last expression in the block)
+      content_node = body.children[2].children[0]
+
+      # Check if content is an array or hash literal
+      return false if content_node.type == :array ||
+                      content_node.type == :hash
+
+      true
+    end
+
+    def contains_complex_structure?(node)
+      return true if [:array, :hash].include?(node.type)
+
+      # Recursively check children for complex structures
+      node.children.any? do |child|
+        child.is_a?(Parser::AST::Node) &&
+          ([:array, :hash].include?(child.type) || contains_complex_structure?(child))
+      end
+    end
+
     def process_content_for(method_call, body)
       content_key = extract_content(method_call.children[2])
 
-      if body.is_a?(Parser::AST::Node) && (body.type == :str)
-        # Single string content, use shorthand syntax
-        content = body.type == :str ? "\"#{extract_content(body)}\"" : extract_content(body)
+      # Use inline form for simple content (strings, method calls, variables) or simple blocks
+      if body.is_a?(Parser::AST::Node) && contains_complex_structure?(body) == false
+
+        content = if body.type == :str
+                    "\"#{extract_content(body)}\""
+                  else
+                    extract_content(body)
+                  end
+
         add_line("<% content_for #{content_key}, #{content} %>", :process_content_for)
       else
-        # Multi-statement block
+        # Use block form for complex content
         add_line("<% content_for #{content_key} do %>", :process_content_for)
         indent do
           process_node(body) if body
@@ -488,7 +520,7 @@ module MarkabyToErb
         extract_content_for_hash(node)
       when :array
         # Properly format array elements
-        '[' + node.children.map { |element| "\"#{extract_content(element)}\"" }.join(', ') + ']'
+        extract_content_for_array(node)
       when :send
         extract_content_for_send(node)
       when :dstr
@@ -538,6 +570,27 @@ module MarkabyToErb
       end.join(', ') + '}'
     end
 
+    def extract_content_for_array(node)
+      array_content = node.children.map do |element|
+        case element.type
+        when :hash
+          extract_content_for_hash(element)
+        when :str
+          "\"#{extract_content(element)}\""
+        when :send
+          if element.children[1] == :t
+            "t('#{extract_content(element.children[2])}')"
+          else
+            extract_content(element)
+          end
+        else
+          extract_content(element)
+        end
+      end.join(', ')
+
+      "[#{array_content}]"
+    end
+
     def extract_content_for_send(node)
       receiver, method_name, *arguments = node.children
 
@@ -559,6 +612,11 @@ module MarkabyToErb
         receiver_str = extract_content(receiver)
         arguments_str = arguments.map { |arg| extract_content(arg) }.join(", ")
         return "#{receiver_str}[#{arguments_str}]"
+      end
+
+      if method_name == :t
+        # Special case for translation calls
+        return "t('#{extract_content(arguments[0])}')"
       end
 
       # Special handling for string concatenation with +
