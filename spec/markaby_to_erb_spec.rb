@@ -880,4 +880,177 @@ RSpec.describe MarkabyToErb::Converter do
     erb_code = converter.convert
     expect(erb_code.strip).to eq(expected_erb)
   end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      text number_to_human_size(@limit.to_i * 1024 * 1024)
+    MARKABY
+
+    expected_erb = <<~ERB.strip
+      <%= number_to_human_size(@limit.to_i * 1024 * 1024) %>
+    ERB
+
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      lightbox_header "Add new Credential to #\{params[:type].capitalize}list"
+    MARKABY
+
+    expected_erb = <<~ERB.strip
+      <%= lightbox_header "Add new Credential to #\{params[:type].capitalize}list" %>
+    ERB
+
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      tr :id => "mail_account_#\{mail_account.id}" do
+        td do
+          case mail_account.class_name
+            when 'MailAlias' then 'Mail Alias'
+            when 'MailGroup' then 'Mail Group'
+            else  'Mail Pup'
+          end
+        end
+      end
+    MARKABY
+
+    expected_erb = <<~ERB.strip
+      <tr id="mail_account_<%= mail_account.id %>">
+        <td>
+          <% case mail_account.class_name %>
+          <% when 'MailAlias' %>
+            Mail Alias
+          <% when 'MailGroup' %>
+            Mail Group
+          <% else %>
+            Mail Pup
+          <% end %>
+        </td>
+      </tr>
+    ERB
+
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      if 1 == 1 or 2==2 then
+        p 'hello'
+      end
+    MARKABY
+
+    expected_erb = <<~ERB.strip
+      <% if 1 == 1 || 2 == 2 %>
+        <p>hello</p>
+      <% end %>
+    ERB
+
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      (1...4).each{|i| p i}
+    MARKABY
+
+    expected_erb = <<~ERB.strip
+      <% (1...4).each do |i| %>
+        <p><%= i %></p>
+      <% end %>
+    ERB
+
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      terms.each do |term|
+        next if package == 'starter' and term == 1
+        p term
+      end
+    MARKABY
+
+    expected_erb = <<~ERB.strip
+      <% terms.each do |term| %>
+        <% next if package == 'starter' and term == 1 %>
+        <p>term</p>
+      <% end %>
+    ERB
+
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      if !@collected_stats[current_date].nil? && !@collected_stats[current_date][package].nil? && !@collected_stats[current_date][package][tier].nil? && !@collected_stats[current_date][package][tier][term].nil? && !@collected_stats[current_date][package][tier][term][multiplier].nil? then
+        total = @collected_stats[current_date][package][tier][term][multiplier]
+      end
+    MARKABY
+
+    expected_erb = <<~ERB.strip
+      <% if !@collected_stats[current_date].nil? && !@collected_stats[current_date][package].nil? && !@collected_stats[current_date][package][tier].nil? && !@collected_stats[current_date][package][tier][term].nil? && !@collected_stats[current_date][package][tier][term][multiplier].nil? %>
+        <% total = @collected_stats[current_date][package][tier][term][multiplier] %>
+      <% end %>
+    ERB
+
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      if !@collected_stats[current_date].nil? && !@collected_stats[current_date][package].nil? && !@collected_stats[current_date][package][tier].nil? && !@collected_stats[current_date][package][tier][term].nil? && !@collected_stats[current_date][package][tier][term][multiplier].nil? then
+        total = @collected_stats[current_date][package][tier][term][multiplier]
+      end
+    MARKABY
+
+    expected_erb = <<~ERB.strip
+      <% if !@collected_stats[current_date].nil? && !@collected_stats[current_date][package].nil? && !@collected_stats[current_date][package][tier].nil? && !@collected_stats[current_date][package][tier][term].nil? && !@collected_stats[current_date][package][tier][term][multiplier].nil? %>
+        <% total = @collected_stats[current_date][package][tier][term][multiplier] %>
+      <% end %>
+    ERB
+
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      begin
+        li "#\{CGI.escapeHTML(k)} (parsed to hash/array) => #\{v.inspect}".html_safe
+      rescue => e
+        li "#\{CGI.escapeHTML(k)} (unparseable - #\{e.message}) => #\{v.class}".html_safe
+      end
+    MARKABY
+
+    expected_erb = <<~ERB.strip
+      <% begin %>
+      <li><%= "#\{CGI.escapeHTML(k)} (parsed to hash/array) => #\{v.inspect}".html_safe %></li>
+      <% rescue => e %>
+      <li><%= "#\{CGI.escapeHTML(k)} (unparseable - #\{e.message}) => #\{v.class}".html_safe %></li>
+      <% end %>
+    ERB
+
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
 end

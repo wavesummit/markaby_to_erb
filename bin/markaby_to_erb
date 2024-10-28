@@ -94,6 +94,11 @@ end
 def process_file(input_file, output_file, rename_old)
   begin
     markaby_code = File.read(input_file)
+
+    if markaby_code.empty?
+      puts "File empty"
+      return
+    end
   rescue Errno::ENOENT
     puts "Input file not found: #{input_file}"
     return

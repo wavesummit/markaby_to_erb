@@ -189,7 +189,7 @@ module MarkabyToErb
       # Increase indentation for the when and else clauses
       indent do
         clauses.each do |clause|
-          if clause.type == :when
+          if clause&.type == :when
             # Handle 'when' clauses
             # Each 'when' clause can have multiple conditions
             conditions = clause.children[0..-2] # All but the last child
