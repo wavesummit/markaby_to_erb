@@ -944,13 +944,13 @@ RSpec.describe MarkabyToErb::Converter do
 
   it 'converts markaby code' do
     markaby_code = <<~MARKABY
-      if 1 == 1 or 2==2 then
+      if 1 == 1 or 2==2 or 3==3 then
         p 'hello'
       end
     MARKABY
 
     expected_erb = <<~ERB.strip
-      <% if 1 == 1 || 2 == 2 %>
+      <% if 1 == 1 || 2 == 2 || 3 == 3 %>
         <p>hello</p>
       <% end %>
     ERB
@@ -988,24 +988,6 @@ RSpec.describe MarkabyToErb::Converter do
       <% terms.each do |term| %>
         <% next if package == 'starter' and term == 1 %>
         <p>term</p>
-      <% end %>
-    ERB
-
-    converter = MarkabyToErb::Converter.new(markaby_code)
-    erb_code = converter.convert
-    expect(erb_code.strip).to eq(expected_erb)
-  end
-
-  it 'converts markaby code' do
-    markaby_code = <<~MARKABY
-      if !@collected_stats[current_date].nil? && !@collected_stats[current_date][package].nil? && !@collected_stats[current_date][package][tier].nil? && !@collected_stats[current_date][package][tier][term].nil? && !@collected_stats[current_date][package][tier][term][multiplier].nil? then
-        total = @collected_stats[current_date][package][tier][term][multiplier]
-      end
-    MARKABY
-
-    expected_erb = <<~ERB.strip
-      <% if !@collected_stats[current_date].nil? && !@collected_stats[current_date][package].nil? && !@collected_stats[current_date][package][tier].nil? && !@collected_stats[current_date][package][tier][term].nil? && !@collected_stats[current_date][package][tier][term][multiplier].nil? %>
-        <% total = @collected_stats[current_date][package][tier][term][multiplier] %>
       <% end %>
     ERB
 

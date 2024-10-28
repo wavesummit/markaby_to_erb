@@ -166,7 +166,7 @@ module MarkabyToErb
     def process_method(node)
       receiver, method_name, *args = node.children
       arguments = args.map do |arg|
-        [:str,:dstr].include?( arg.type ) ? "\"#{extract_content(arg)}\"" : extract_content(arg)
+        [:str, :dstr].include?(arg.type) ? "\"#{extract_content(arg)}\"" : extract_content(arg)
       end.join(', ')
 
       result = [method_name, arguments].reject { |a| a.empty? }.join(' ')
@@ -492,6 +492,7 @@ module MarkabyToErb
 
     def extract_content(node)
       return '' if node.nil?
+
       case node.type
       when :true
         'true'
@@ -527,8 +528,37 @@ module MarkabyToErb
         # Handle `if` statements
         condition, if_body, else_body = node.children
         "if #{extract_content(condition)} ? #{extract_content(if_body)} : #{extract_content(else_body)}"
+      when :or, :and
+        extract_content_for_operators(node)
       else
         ''
+      end
+    end
+
+    def extract_content_for_operators(node)
+      expressions = node.children.map do |child|
+        case child.type
+        when :send
+          extract_content_for_send(child)
+        when :or, :and
+          extract_content_for_operators(child)
+        else
+          extract_content(child)
+        end
+      end
+
+      operator = convert_operator(node.type)
+      expressions.join(" #{operator} ")
+    end
+
+    def convert_operator(op)
+      case op
+      when :or
+        "||"
+      when :and
+        "&&"
+      else
+        ""
       end
     end
 
@@ -607,7 +637,7 @@ module MarkabyToErb
         if key_node.type == :str
           key_str = "'#{key_str}'" # Adds quotes around strings
         else
-          key_str = key_str  # Leaves variables or dynamic expressions as is
+          key_str = key_str # Leaves variables or dynamic expressions as is
         end
 
         return "params[#{key_str}]"
