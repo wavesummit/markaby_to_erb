@@ -166,7 +166,7 @@ module MarkabyToErb
     def process_method(node)
       receiver, method_name, *args = node.children
       arguments = args.map do |arg|
-        arg.type == :str ? "\"#{extract_content(arg)}\"" : extract_content(arg)
+        [:str,:dstr].include?( arg.type ) ? "\"#{extract_content(arg)}\"" : extract_content(arg)
       end.join(', ')
 
       result = [method_name, arguments].reject { |a| a.empty? }.join(' ')
@@ -229,7 +229,6 @@ module MarkabyToErb
     def process_send(node)
       receiver, method_name, *args = node.children
       html_tag, classes, ids = extract_html_tag_and_attributes(node)
-      #  binding.pry
 
       if helper_call?(method_name)
         process_method(node)
@@ -493,7 +492,6 @@ module MarkabyToErb
 
     def extract_content(node)
       return '' if node.nil?
-
       case node.type
       when :true
         'true'
@@ -537,7 +535,6 @@ module MarkabyToErb
     def extract_content_for_dstr(node)
       # return node.children.map { |child| extract_content(child) }.join
       # Build the interpolated string, omitting ERB tags
-
       node.children.map do |child|
         case child.type
         when :str
@@ -603,8 +600,17 @@ module MarkabyToErb
 
       # Special handling for params[:key] syntax
       if receiver && receiver.type == :send && receiver.children[1] == :params && method_name == :[]
-        param_key = arguments[0].type == :str ? ":#{arguments[0].children[0]}" : arguments[0].children[0]
-        return "params[#{param_key}]"
+        key_node = arguments[0]
+        key_str = extract_content(key_node)
+
+        # Properly format the key based on its type
+        if key_node.type == :str
+          key_str = "'#{key_str}'" # Adds quotes around strings
+        else
+          key_str = key_str  # Leaves variables or dynamic expressions as is
+        end
+
+        return "params[#{key_str}]"
       end
 
       # Handle array access (e.g., `STATUS_TO_READABLE[mail_account.status]`)

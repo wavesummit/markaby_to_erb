@@ -383,7 +383,7 @@ RSpec.describe MarkabyToErb::Converter do
     MARKABY
 
     expected_erb = <<~ERB.strip
-      <%= form_remote_tag {:url => {:controller => 'user', :action => 'add_command_form', :order_id => params[:order_id], :id => params[:id]}} %>
+      <%= form_remote_tag {:url => {:controller => 'user', :action => 'add_command_form', :order_id => params['order_id'], :id => params['id']}} %>
       <%= label "Hello" %>
       <%= end_form %>
     ERB
