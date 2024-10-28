@@ -48,6 +48,8 @@ module MarkabyToErb
         process_yield(node)
       when :case
         process_case(node)
+      when :next
+        process_next(node)
       else
         puts "Unhandled node type: #{node.type}"
       end
@@ -76,6 +78,16 @@ module MarkabyToErb
       formatted_value = formatted_value.strip
 
       add_line("<% #{variable} #{operator}= #{formatted_value} %>", :process_op_asgn)
+    end
+
+    def process_next(node)
+      condition = node.children[0]
+      if condition
+        condition_str = extract_content(condition)
+        add_line("<% next if #{condition_str} %>", :process_next)
+      else
+        add_line("<% next %>", :process_next)
+      end
     end
 
     def process_str(node)
@@ -558,7 +570,7 @@ module MarkabyToErb
       when :and
         "&&"
       else
-        ""
+        op.to_s
       end
     end
 
@@ -624,7 +636,9 @@ module MarkabyToErb
       # Special handling for comparison operators
       if %i[> < >= <= == !=].include?(method_name)
         receiver_str = receiver ? extract_content(receiver) : ''
-        arg_str = arguments.map { |arg| extract_content(arg) }.join
+        arg_str = arguments.map do |arg|
+          arg.type == :str ? "'#{extract_content(arg)}'" : extract_content(arg)
+        end.join
         return "#{receiver_str} #{method_name} #{arg_str}"
       end
 

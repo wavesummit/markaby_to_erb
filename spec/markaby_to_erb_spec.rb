@@ -986,8 +986,10 @@ RSpec.describe MarkabyToErb::Converter do
 
     expected_erb = <<~ERB.strip
       <% terms.each do |term| %>
-        <% next if package == 'starter' and term == 1 %>
-        <p>term</p>
+        <% if package == 'starter' && term == 1 %>
+          <% next %>
+        <% end %>
+        <p><%= term %></p>
       <% end %>
     ERB
 
