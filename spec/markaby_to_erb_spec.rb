@@ -1037,4 +1037,95 @@ RSpec.describe MarkabyToErb::Converter do
     erb_code = converter.convert
     expect(erb_code.strip).to eq(expected_erb)
   end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      render :partial => 'credit_card/card_row', :collection =>  @credit_cards
+    MARKABY
+
+    expected_erb = <<~ERB.strip
+      <%= render :partial => 'credit_card/card_row', :collection => @credit_cards %>
+    ERB
+
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      default_month = ("%02d" % old_card.exp_month)
+    MARKABY
+
+    expected_erb = <<~ERB.strip
+      <% default_month = ("%02d" % old_card.exp_month) %>
+    ERB
+
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      select_tag "card_type[visa]", options_for_select(["Visa"]+["MasterCard"], " "), :style => inputStyle
+    MARKABY
+
+    expected_erb = <<~ERB.strip
+      <%= select_tag "card_type[visa]", options_for_select(["Visa"]+["MasterCard"], " "), :style => inputStyle %>
+    ERB
+
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      some_var =  "#\{"%02d" % m}"
+    MARKABY
+
+    expected_erb = <<~ERB.strip
+      <% some_var = "#\{"%02d" % m}" %>
+    ERB
+
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      select_tag "credit_card[expiration_month]", options_for_select([["Select Month", " "]]+(1..12).collect { |m| ["#{"%02d" % m} - #{Date::ABBR_MONTHNAMES[m]}", "%02d" % m] }, default_month), :style => 'margin-right: 10px;'
+    MARKABY
+
+    expected_erb = <<~ERB.strip
+      <%= select_tag "credit_card[expiration_month]", options_for_select([["Select Month", " "]]+(1..12).collect { |m| ["#{"%02d" % m} - #{Date::ABBR_MONTHNAMES[m]}", "%02d" % m] }, default_month), :style => 'margin-right: 10px;' %>
+    ERB
+
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+    inputStyle = (params['lightbox']=='true') ? 'width:286px':''
+    MARKABY
+
+    expected_erb = <<~ERB.strip
+      <% inputStyle = (params['lightbox']=='true') ? 'width:286px':'' %>
+    ERB
+
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
 end
+
+
+
+
+#<%= render( {:partial => 'credit_card/card_row', :collection => @credit_cards} ) %>
+#<%= render :partial => 'credit_card/card_row', :collection => @credit_cards %>
