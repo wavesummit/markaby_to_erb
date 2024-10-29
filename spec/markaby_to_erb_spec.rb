@@ -383,9 +383,9 @@ RSpec.describe MarkabyToErb::Converter do
     MARKABY
 
     expected_erb = <<~ERB.strip
-      <%= form_remote_tag {:url => {:controller => 'user', :action => 'add_command_form', :order_id => params['order_id'], :id => params['id']}} %>
+      <%= form_remote_tag :url => {:controller => 'user', :action => 'add_command_form', :order_id => params['order_id'], :id => params['id']} %>
       <%= label "Hello" %>
-      <%= end_form %>
+      </form>
     ERB
     converter = MarkabyToErb::Converter.new(markaby_code)
     erb_code = converter.convert
@@ -665,7 +665,7 @@ RSpec.describe MarkabyToErb::Converter do
           </tr>
         </thead>
         <tbody id="credentials">
-          <%= render {:partial => 'listed_credential', :collection => listed_credentials} %>
+          <%= render :partial => 'listed_credential', :collection => listed_credentials %>
         </tbody>
       </table>
     ERB
@@ -683,7 +683,7 @@ RSpec.describe MarkabyToErb::Converter do
     expected_erb = <<~ERB.strip
       <tbody class="searchedLogins">
         <% unless @results.nil? %>
-          <%= render {:partial => 'user', :collection => @results} %>
+          <%= render :partial => 'user', :collection => @results %>
         <% end %>
       </tbody>
     ERB
@@ -732,7 +732,7 @@ RSpec.describe MarkabyToErb::Converter do
     MARKABY
     expected_erb = <<~ERB.strip
       <tr id=\"searchResult-#\{marked_user.id}\">
-        <%= render {:partial => 'user_row', :locals => {:marked_user => marked_user}} %>
+        <%= render :partial => 'user_row', :locals => {:marked_user => marked_user} %>
       </tr>
     ERB
     converter = MarkabyToErb::Converter.new(markaby_code)
@@ -1096,11 +1096,11 @@ RSpec.describe MarkabyToErb::Converter do
 
   it 'converts markaby code' do
     markaby_code = <<~MARKABY
-      select_tag "credit_card[expiration_month]", options_for_select([["Select Month", " "]]+(1..12).collect { |m| ["#{"%02d" % m} - #{Date::ABBR_MONTHNAMES[m]}", "%02d" % m] }, default_month), :style => 'margin-right: 10px;'
+      select_tag "credit_card[expiration_month]", options_for_select([["Select Month", " "]]+(1..12).collect { |m| ["#\{"%02d" % m} - #\{Date::ABBR_MONTHNAMES[m]}", "%02d" % m] }, default_month), :style => 'margin-right: 10px;'
     MARKABY
 
     expected_erb = <<~ERB.strip
-      <%= select_tag "credit_card[expiration_month]", options_for_select([["Select Month", " "]]+(1..12).collect { |m| ["#{"%02d" % m} - #{Date::ABBR_MONTHNAMES[m]}", "%02d" % m] }, default_month), :style => 'margin-right: 10px;' %>
+      <%= select_tag "credit_card[expiration_month]", options_for_select([["Select Month", " "]]+(1..12).collect { |m| ["#\{"%02d" % m} - #\{Date::ABBR_MONTHNAMES[m]}", "%02d" % m] }, default_month), :style => 'margin-right: 10px;' %>
     ERB
 
     converter = MarkabyToErb::Converter.new(markaby_code)
@@ -1123,9 +1123,3 @@ RSpec.describe MarkabyToErb::Converter do
   end
 
 end
-
-
-
-
-#<%= render( {:partial => 'credit_card/card_row', :collection => @credit_cards} ) %>
-#<%= render :partial => 'credit_card/card_row', :collection => @credit_cards %>

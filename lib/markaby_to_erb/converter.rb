@@ -243,7 +243,13 @@ module MarkabyToErb
       html_tag, classes, ids = extract_html_tag_and_attributes(node)
 
       if helper_call?(method_name)
-        process_method(node)
+
+        #render takes in 
+        if args.size == 1 && args[0]&.type == :hash
+          add_line("<%= #{method_name} #{extract_content_for_hash(args[0], false)} %>", :process_send)
+        else
+          process_method(node)
+        end
 
       elsif method_name == :content_for
         process_content_for(node, args)
@@ -293,7 +299,10 @@ module MarkabyToErb
 
         html_tag = node.children[2].children[0]
         attributes = extract_attributes(node.children.drop(2))
-        add_line("<#{html_tag}#{attributes}/>", :process_block)
+        add_line("<#{html_tag}#{attributes}/>", :process_send)
+
+      elsif method_name == :end_form
+          add_line("</form>", :process_send)
 
       elsif function_call?(node)
         process_method(node)
@@ -589,8 +598,8 @@ module MarkabyToErb
       end.join
     end
 
-    def extract_content_for_hash(node)
-      '{' + node.children.map do |pair|
+    def extract_content_for_hash(node, with_brackets = true)
+      result = node.children.map do |pair|
         key, value = pair.children
 
         # Determine the key's format
@@ -606,7 +615,8 @@ module MarkabyToErb
         end
 
         "#{key_str} => #{hash_val}"
-      end.join(', ') + '}'
+      end.join(', ')
+      with_brackets ? "{#{result}}" : result
     end
 
     def extract_content_for_array(node)
@@ -741,8 +751,12 @@ module MarkabyToErb
       %w[meta input br hr img link].include?(method_name.to_s)
     end
 
+    def keyword_arguments_method?(method_name)
+      %w[render].include?(method_name.to_s)
+    end
+
     def helper_call?(method_name)
-      helpers = %w[select_field observe_field label form_tag form_for form_remote_tag submit_tag label_tag
+      helpers = %w[render select_field observe_field label form_tag form_for form_remote_tag submit_tag label_tag
                    text_field_tag password_field_tag select_tag check_box_tag radio_button_tag file_field_tag
                    link_to link_to_remote button_to
                    url_for image_tag stylesheet_link_tag javascript_include_tag date_select time_select
