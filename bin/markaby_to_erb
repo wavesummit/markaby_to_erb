@@ -1,17 +1,16 @@
 #!/usr/bin/env ruby
+# Determine the script's directory and set the project directory one level up
 
-# Add the lib directory to the load path
-$LOAD_PATH.unshift(File.expand_path('../lib', __dir__))
-
-# !/usr/bin/env ruby
-
+#require 'bundler/setup' # Include if using Bundler
 require 'optparse'
-require 'markaby_to_erb'
 require 'find'
 require 'fileutils'
 
+
 # Add the lib directory to the load path
 $LOAD_PATH.unshift(File.expand_path('../lib', __dir__))
+
+require 'markaby_to_erb'
 
 options = {}
 OptionParser.new do |opts|

@@ -244,7 +244,7 @@ module MarkabyToErb
 
       if helper_call?(method_name)
 
-        #render takes in 
+        #render takes in
         if args.size == 1 && args[0]&.type == :hash
           add_line("<%= #{method_name} #{extract_content_for_hash(args[0], false)} %>", :process_send)
         else
@@ -548,7 +548,7 @@ module MarkabyToErb
       when :if
         # Handle `if` statements
         condition, if_body, else_body = node.children
-        "if #{extract_content(condition)} ? #{extract_content(if_body)} : #{extract_content(else_body)}"
+        "#{extract_content(condition)} ? #{extract_content(if_body)} : #{extract_content(else_body)}"
       when :or, :and
         extract_content_for_operators(node)
       else

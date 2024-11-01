@@ -1114,7 +1114,58 @@ RSpec.describe MarkabyToErb::Converter do
     MARKABY
 
     expected_erb = <<~ERB.strip
-      <% inputStyle = (params['lightbox']=='true') ? 'width:286px':'' %>
+      <% inputStyle = params['lightbox'] == 'true' ? 'width:286px':'' %>
+    ERB
+
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+    link_to_remote 'Click here to manage these records.', :before => "$('loadingDiv').innerHTML=#\{image_tag('interface/lightbox/progressbar.gif', :alt => 'loading').dump\} + \' Loading ... Please Wait ...'" , :complete => "$('loadingDiv').innerHTML=''", :url => {:controller => 'dns', :action  => 'advanced_dns_block', :domain_name => params[:domain_name]}
+    MARKABY
+
+    expected_erb = <<~ERB.strip
+    <%= link_to_remote(image_tag('/images/icons/pro_payment-check.gif'), :before => "$('loadingDiv').innerHTML=#\{image_tag('interface/lightbox/progressbar.gif', :alt => 'loading').dump} + \' Loading ... Please Wait ...\'', :complete => "$('loadingDiv').innerHTML=''", :url => { :action => "#\{active_link_to}", :order_id => order.id }) %>
+    ERB
+
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+      div.comment_posted! { p @comment.visible? ? t('.your_comment_has_been_posted') : t('.your_comment_has_been_submitted') }
+    MARKABY
+
+    expected_erb = <<~ERB.strip
+      <div id="comment_posted">
+        <p><%= @comment.visible? ? t('.your_comment_has_been_posted') : t('.your_comment_has_been_submitted') %></p>
+      </div>
+    ERB
+
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+    text "<script>
+    (function($){\
+    })(BNJQ)
+    </script>"
+    MARKABY
+
+    expected_erb = <<~ERB.strip
+    <script>
+      (function($){})(BNJQ)
+    </script>
     ERB
 
     converter = MarkabyToErb::Converter.new(markaby_code)
