@@ -118,7 +118,7 @@ RSpec.describe MarkabyToErb::Converter do
     MARKABY
 
     expected_erb = <<~ERB.strip
-      <%= label "Name:" %>
+      <label>Name:</label>
     ERB
 
     converter = MarkabyToErb::Converter.new(markaby_code)
@@ -141,10 +141,10 @@ RSpec.describe MarkabyToErb::Converter do
 
     expected_erb = <<~ERB.strip
       <form action="/submit" method="post">
-        <%= label "Name:" %>
+        <label>Name:</label>
         <input type="text" name="username">
         <br>
-        <%= label "Password:" %>
+        <label>Password:</label>
         <input type="password" name="password">
         <br>
         <input type="submit" value="Login">
@@ -384,7 +384,7 @@ RSpec.describe MarkabyToErb::Converter do
 
     expected_erb = <<~ERB.strip
       <%= form_remote_tag :url => {:controller => 'user', :action => 'add_command_form', :order_id => params['order_id'], :id => params['id']} %>
-      <%= label "Hello" %>
+      <label>Hello</label>
       </form>
     ERB
     converter = MarkabyToErb::Converter.new(markaby_code)
@@ -1173,4 +1173,47 @@ RSpec.describe MarkabyToErb::Converter do
     expect(erb_code.strip).to eq(expected_erb)
   end
 
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+    label 'Domain Contact:', :for => 'transfer[contact_id]'
+    MARKABY
+    expected_erb = <<~ERB.strip
+    <label for="transfer[contact_id]">Domain Contact:</label>
+    ERB
+
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+    select_field :transfer, :contact_id, domain_contacts.collect {|p| [ p.label, p.id ] }
+    MARKABY
+    expected_erb = <<~ERB.strip
+      <%= select_field :transfer, :contact_id, domain_contacts.collect {|p| [ p.label, p.id ] } %>
+    ERB
+
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
+
+  it 'converts markaby code' do
+    markaby_code = <<~MARKABY
+    p { 'You must ' + link_to_lightbox('create a domain contact', :action => 'create_for_transfer', :controller => 'domain_contact') + ' before you can continue your transfer request.' }
+    MARKABY
+    
+    expected_erb = <<~ERB.strip
+      <p>
+        You must
+        <%= link_to_lightbox('create a domain contact', :action => 'create_for_transfer', :controller => 'domain_contact') %>
+        before you can continue your transfer request.
+      </p>
+    ERB
+
+    converter = MarkabyToErb::Converter.new(markaby_code)
+    erb_code = converter.convert
+    expect(erb_code.strip).to eq(expected_erb)
+  end
 end

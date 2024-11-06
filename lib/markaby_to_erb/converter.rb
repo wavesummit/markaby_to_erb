@@ -756,7 +756,7 @@ module MarkabyToErb
     end
 
     def helper_call?(method_name)
-      helpers = %w[render select_field observe_field label form_tag form_for form_remote_tag submit_tag label_tag
+      helpers = %w[render select_field observe_field form_tag form_for form_remote_tag submit_tag label_tag
                    text_field_tag password_field_tag select_tag check_box_tag radio_button_tag file_field_tag
                    link_to link_to_remote button_to
                    url_for image_tag stylesheet_link_tag javascript_include_tag date_select time_select
