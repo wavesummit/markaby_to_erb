@@ -208,7 +208,7 @@ module MarkabyToErb
             body = clause.children[-1] # The last child is the body
 
             # Extract conditions as a comma-separated string
-            condition_str = conditions.map { |cond| extract_content(cond) }.join(', ')
+            condition_str = conditions.map { |cond| cond.type == :str ? "\'#{extract_content(cond)}\'" : extract_content(cond) }.join(', ')
 
             # Add the 'when' line in ERB
             add_line("<% when #{condition_str} %>", :process_case)
@@ -728,7 +728,12 @@ module MarkabyToErb
         hash_arg.children.map do |pair|
           key, value = pair.children
           key_str = key.children[0].to_s.gsub(':', '')
-          value_str = extract_content(value)
+
+          if value.type == :dstr
+            value_str = "<%=\"#{extract_content(value)}\"%>"
+          else
+            value_str = extract_content(value)
+          end
           "#{key_str}=\"#{value_str}\""
         end
       end

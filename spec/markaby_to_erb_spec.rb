@@ -731,7 +731,7 @@ RSpec.describe MarkabyToErb::Converter do
       end
     MARKABY
     expected_erb = <<~ERB.strip
-      <tr id=\"searchResult-#\{marked_user.id}\">
+      <tr id="\<%="searchResult-#\{marked_user.id}\"%>\">
         <%= render :partial => 'user_row', :locals => {:marked_user => marked_user} %>
       </tr>
     ERB
@@ -923,15 +923,15 @@ RSpec.describe MarkabyToErb::Converter do
     MARKABY
 
     expected_erb = <<~ERB.strip
-      <tr id="mail_account_<%= mail_account.id %>">
+      <tr id="<%="mail_account_#\{mail_account.id}"%>">
         <td>
           <% case mail_account.class_name %>
-          <% when 'MailAlias' %>
-            Mail Alias
-          <% when 'MailGroup' %>
-            Mail Group
-          <% else %>
-            Mail Pup
+            <% when 'MailAlias' %>
+              Mail Alias
+            <% when 'MailGroup' %>
+              Mail Group
+            <% else %>
+              Mail Pup
           <% end %>
         </td>
       </tr>
@@ -1203,7 +1203,7 @@ RSpec.describe MarkabyToErb::Converter do
     markaby_code = <<~MARKABY
     p { 'You must ' + link_to_lightbox('create a domain contact', :action => 'create_for_transfer', :controller => 'domain_contact') + ' before you can continue your transfer request.' }
     MARKABY
-    
+
     expected_erb = <<~ERB.strip
       <p>
         You must
