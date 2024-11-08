@@ -497,6 +497,12 @@ module MarkabyToErb
     def extract_receiver_chain(node)
       if node.nil?
         ''
+      elsif node.type == :begin
+        extract_receiver_chain(node.children[0])
+      elsif node.type == :erange
+        rstart = node.children[0].children[0]
+        rend = node.children[1].children[0]
+        "(#{rstart}...#{rend})"
       elsif node.type == :send
         # Recursively extract the method chain
         receiver = extract_receiver_chain(node.children[0])
