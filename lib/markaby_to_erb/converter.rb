@@ -519,7 +519,6 @@ module MarkabyToErb
 
     def extract_content(node)
       return '' if node.nil?
-
       case node.type
       when :true
         'true'
@@ -698,12 +697,15 @@ module MarkabyToErb
         return "#{receiver_str} + #{arg_str}"
       end
 
-      # Special handling for the + operator in method chains
-      if method_name == :+ && receiver && receiver.type == :send
-        receiver_str = extract_content(receiver)
-        arguments_str = arguments.map { |arg| extract_content(arg) }.join
-        return "#{receiver_str} + #{arguments_str}" # No parentheses here
+      #handle math operations
+      if %i[+ * \ % -].include?(method_name) && receiver && receiver.type == :send
+        receiver_str = receiver ? extract_content(receiver) : ''
+        arg_str = arguments.map do |arg|
+          arg.type == :str ? "'#{extract_content(arg)}'" : extract_content(arg)
+        end.join
+        return "#{receiver_str} #{method_name} #{arg_str}"
       end
+
 
       # Normal method call processing
       receiver_str = receiver ? extract_content(receiver) : ''
@@ -771,7 +773,7 @@ module MarkabyToErb
                    text_field_tag password_field_tag select_tag check_box_tag radio_button_tag file_field_tag
                    link_to link_to_remote button_to
                    url_for image_tag stylesheet_link_tag javascript_include_tag date_select time_select
-                   distance_of_time_in_words truncate highlight simple_format sanitize content_tag flash]
+                   distance_of_time_in_words truncate highlight simple_format sanitize content_tag flash number_to_human_size]
 
       helpers.include?(method_name.to_s)
     end
