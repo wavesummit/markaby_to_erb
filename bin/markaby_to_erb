@@ -1,11 +1,10 @@
 #!/usr/bin/env ruby
 # Determine the script's directory and set the project directory one level up
 
-#require 'bundler/setup' # Include if using Bundler
+# require 'bundler/setup' # Include if using Bundler
 require 'optparse'
 require 'find'
 require 'fileutils'
-
 
 # Add the lib directory to the load path
 $LOAD_PATH.unshift(File.expand_path('../lib', __dir__))
