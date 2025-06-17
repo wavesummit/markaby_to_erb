@@ -522,7 +522,7 @@ RSpec.describe MarkabyToErb::Converter do
     MARKABY
     expected_erb = <<~ERB.strip
       <div>
-        <%= @some_var %>
+        <\%= @some_var %>
       </div>
     ERB
     expect_conversion(markaby_code, expected_erb)
