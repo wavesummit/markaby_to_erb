@@ -1,0 +1,15 @@
+current directory: /Users/jmoxley/Work/markaby_to_erb/vendor/bundle/ruby/3.0.0/gems/racc-1.8.1/ext/racc/cparse
+/Users/jmoxley/.rvm/rubies/ruby-3.0.7/bin/ruby -I /Users/jmoxley/.rvm/rubies/ruby-3.0.7/lib/ruby/3.0.0 -r ./siteconf20250617-11581-zmhgep.rb extconf.rb
+creating Makefile
+
+current directory: /Users/jmoxley/Work/markaby_to_erb/vendor/bundle/ruby/3.0.0/gems/racc-1.8.1/ext/racc/cparse
+make DESTDIR\= clean
+
+current directory: /Users/jmoxley/Work/markaby_to_erb/vendor/bundle/ruby/3.0.0/gems/racc-1.8.1/ext/racc/cparse
+make DESTDIR\=
+compiling cparse.c
+linking shared-object racc/cparse.bundle
+
+current directory: /Users/jmoxley/Work/markaby_to_erb/vendor/bundle/ruby/3.0.0/gems/racc-1.8.1/ext/racc/cparse
+make DESTDIR\= install
+/opt/homebrew/bin/ginstall -c -m 0755 cparse.bundle ./.gem.20250617-11581-i1muxi/racc
