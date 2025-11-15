@@ -1082,7 +1082,7 @@ RSpec.describe MarkabyToErb::Converter do
       select_field :transfer, :contact_id, domain_contacts.collect {|p| [ p.label, p.id ] }
     MARKABY
     expected_erb = <<~ERB.strip
-      <%= select_field :transfer, :contact_id, domain_contacts.collect {|p| [ p.label, p.id ] } %>
+      <%= select_field :transfer, :contact_id, domain_contacts.collect { |p| [p.label, p.id] } %>
     ERB
 
     expect_conversion(markaby_code, expected_erb)
@@ -1143,7 +1143,7 @@ RSpec.describe MarkabyToErb::Converter do
   end
 
   it 'converts markaby code with an interpolated string in an h2 tag' do
-    markaby_code = <<~MARKABY
+    markaby_code = <<~'MARKABY'
       h2 "Learn how #{partner.name} can help you get online quickly."
     MARKABY
 
@@ -1167,7 +1167,7 @@ RSpec.describe MarkabyToErb::Converter do
   end
 
   it 'converts markaby code with link_to and image_tag' do
-    markaby_code = <<~MARKABY
+    markaby_code = <<~'MARKABY'
       link_to "Facebook #{image_tag 'facebook_64.png', :size => '64x64', :alt => 'Facebook'}", '/auth/facebook', :class => 'auth_provider'
     MARKABY
 

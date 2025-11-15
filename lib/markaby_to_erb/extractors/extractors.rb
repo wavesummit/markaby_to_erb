@@ -252,8 +252,9 @@
                     end
        block_body = body ? extract_content(body) : ''
        
-       # Format block args - test expects {|p| format (no space after {)
-       block_args_formatted = block_args.empty? ? '' : "|#{block_args}|"
+       # Format block args - some tests expect {|p| (no space), others expect { |n| (with space)
+       # Use { |args| format (with space) for consistency
+       block_args_formatted = block_args.empty? ? '' : " |#{block_args}|"
        if receiver_str.empty?
          method_args_str = method_args.map { |a| extract_content(a) }.join(', ')
          "#{method_name}(#{method_args_str}) {#{block_args_formatted} #{block_body} }"

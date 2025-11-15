@@ -448,8 +448,8 @@
         block_body = body ? extract_content(body) : ''
         
         # Build the expression: receiver.method { |args| body }
-        # Format block args - test expects {|p| format (no space after {)
-        block_args_formatted = block_args.empty? ? '' : "|#{block_args}|"
+        # Format block args - use { |args| format (with space) for consistency
+        block_args_formatted = block_args.empty? ? '' : " |#{block_args}|"
         if receiver_str.empty?
           method_args_str = method_args.map { |a| extract_content(a) }.join(', ')
           "#{method_name}(#{method_args_str}) {#{block_args_formatted} #{block_body} }"
@@ -469,12 +469,13 @@
               pair.children[1] && pair.children[1].type == :hash
             end
             
-            # For hash arguments, don't wrap in curly braces only if:
-            # 1. It's the only argument (no other arguments at all)
-            # 2. It doesn't contain nested hashes
+            # For hash arguments, don't wrap in curly braces if:
+            # 1. It's the last argument
+            # 2. It's the only hash argument
+            # 3. It doesn't contain nested hashes
             # Otherwise, keep the braces for clarity
-            is_only_arg = (args.length == 1)
-            should_wrap = hash_count > 1 || !is_only_arg || has_nested_hash
+            is_last = (index == args.length - 1)
+            should_wrap = hash_count > 1 || !is_last || has_nested_hash
             extract_content_for_hash(arg, should_wrap)
           elsif [:str, :dstr].include?(arg.type)
             "\"#{extract_content(arg)}\""
@@ -761,8 +762,14 @@
 
           add_line("<#{html_tag}#{attributes}>", :process_block)
 
-          indent do
-            process_node(body) if body
+          # Check if body is string concatenation - split across lines
+          if body && body.type == :send && body.children[1] == :+
+            # Handle string concatenation in block bodies
+            process_string_concatenation_in_block(body, html_tag)
+          else
+            indent do
+              process_node(body) if body
+            end
           end
           add_line("</#{html_tag}>", :process_block)
 
@@ -811,6 +818,75 @@
         end
       end
 
+      def process_string_concatenation_in_block(node, html_tag)
+        # node is a :send with :+ method (string concatenation)
+        # Split the concatenation across lines: string parts as text, method calls as ERB
+        parts = []
+        
+        def extract_concatenation_parts(node, parts)
+          return unless node && node.type == :send && node.children[1] == :+
+          
+          receiver = node.children[0]
+          arg = node.children[2]
+          
+          # Process receiver (might be nested concatenation)
+          if receiver.type == :send && receiver.children[1] == :+
+            extract_concatenation_parts(receiver, parts)
+          elsif receiver.type == :str
+            parts << { type: :string, content: receiver.children[0] }
+          elsif receiver.type == :send
+            parts << { type: :method, node: receiver }
+          end
+          
+          # Process argument
+          if arg.type == :str
+            parts << { type: :string, content: arg.children[0] }
+          elsif arg.type == :send
+            parts << { type: :method, node: arg }
+          end
+        end
+        
+        extract_concatenation_parts(node, parts)
+        
+        # Output parts with proper formatting (indented)
+        indent do
+          parts.each do |part|
+            if part[:type] == :string
+              # Output string as text (trimmed)
+              content = part[:content].strip
+              if !content.empty?
+                add_line(content, :process_string_concatenation_in_block)
+              end
+            elsif part[:type] == :method
+              # Output method call as ERB tag
+              # Use process_method to get proper formatting, but extract the ERB code
+              # and add it as a line (not using add_line from process_method)
+              receiver, method_name, *args = part[:node].children
+              arguments = args.map.with_index do |arg, index|
+                if arg.type == :hash
+                  # For hash arguments in string concatenation context, don't wrap in braces
+                  hash_count = args.count { |a| a.type == :hash }
+                  is_last = (index == args.length - 1)
+                  has_nested_hash = arg.children.any? { |pair| pair.children[1] && pair.children[1].type == :hash }
+                  should_wrap = hash_count > 1 || !is_last || has_nested_hash
+                  extract_content_for_hash(arg, should_wrap)
+                elsif arg.type == :str
+                  # Use single quotes for string arguments in this context
+                  "'#{extract_content(arg)}'"
+                elsif arg.type == :dstr
+                  "\"#{extract_dstr(arg)}\""
+                else
+                  extract_content(arg)
+                end
+              end.join(', ')
+              receiver_str = receiver ? extract_content(receiver) : ''
+              method_call_str = receiver_str.empty? ? method_name.to_s : "#{receiver_str}.#{method_name}"
+              result = arguments.empty? ? method_call_str : "#{method_call_str}(#{arguments})"
+              add_line("<%= #{result} %>", :process_string_concatenation_in_block)
+            end
+          end
+        end
+      end
 
       def function_call?(node)
         node.type == :send  # A `send` node represents a function call
