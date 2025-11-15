@@ -218,8 +218,14 @@
         else_clause = node.children.last if node.children.last&.type != :resbody
         
         add_line("<% begin %>", :process_rescue)
-        indent do
+        # Check if body is a single HTML tag call - don't indent in that case
+        is_single_html_tag = body && body.type == :send && html_tag?(body.children[1])
+        if is_single_html_tag
           process_node(body) if body
+        else
+          indent do
+            process_node(body) if body
+          end
         end
         
         rescue_clauses.each do |rescue_clause|
@@ -257,8 +263,14 @@
         rescue_line += " %>"
         
         add_line(rescue_line, :process_resbody)
-        indent do
+        # Check if rescue_body is a single HTML tag call - don't indent in that case
+        is_single_html_tag = rescue_body && rescue_body.type == :send && html_tag?(rescue_body.children[1])
+        if is_single_html_tag
           process_node(rescue_body) if rescue_body
+        else
+          indent do
+            process_node(rescue_body) if rescue_body
+          end
         end
       end
 
@@ -388,6 +400,18 @@
             elsif value_node.type == :dstr
               # Preserve quotes for dstr in assignments
               value = extract_dstr(value_node)
+            elsif value_node.type == :begin
+              # Handle begin nodes (parentheses) - check if inner is % operator
+              inner = value_node.children[0]
+              if inner && inner.type == :send && inner.children[1] == :%
+                # % operator - keep parentheses
+                value = "(#{extract_content(inner)})"
+              else
+                value = extract_content(value_node)
+              end
+            elsif value_node.type == :send && value_node.children[1] == :%
+              # % operator - wrap in parentheses for assignments
+              value = "(#{extract_content(value_node)})"
             else
               value = extract_content(value_node)
             end
@@ -424,11 +448,13 @@
         block_body = body ? extract_content(body) : ''
         
         # Build the expression: receiver.method { |args| body }
+        # Format block args - test expects {|p| format (no space after {)
+        block_args_formatted = block_args.empty? ? '' : "|#{block_args}|"
         if receiver_str.empty?
           method_args_str = method_args.map { |a| extract_content(a) }.join(', ')
-          "#{method_name}(#{method_args_str}) { |#{block_args}| #{block_body} }"
+          "#{method_name}(#{method_args_str}) {#{block_args_formatted} #{block_body} }"
         else
-          "#{receiver_str}.#{method_name} { |#{block_args}| #{block_body} }"
+          "#{receiver_str}.#{method_name} {#{block_args_formatted} #{block_body} }"
         end
       end
 
@@ -444,12 +470,11 @@
             end
             
             # For hash arguments, don't wrap in curly braces only if:
-            # 1. It's the last argument
-            # 2. It's the only hash argument
-            # 3. It doesn't contain nested hashes
+            # 1. It's the only argument (no other arguments at all)
+            # 2. It doesn't contain nested hashes
             # Otherwise, keep the braces for clarity
-            is_last = (index == args.length - 1)
-            should_wrap = hash_count > 1 || !is_last || has_nested_hash
+            is_only_arg = (args.length == 1)
+            should_wrap = hash_count > 1 || !is_only_arg || has_nested_hash
             extract_content_for_hash(arg, should_wrap)
           elsif [:str, :dstr].include?(arg.type)
             "\"#{extract_content(arg)}\""

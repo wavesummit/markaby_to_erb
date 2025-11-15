@@ -240,6 +240,7 @@
 
      def extract_content_for_block(node)
        # Extract block expression like method { |args| body }
+       # Note: This is used when blocks are part of expressions, not when processing block bodies
        method_call, args, body = node.children
        receiver, method_name, *method_args = method_call.children
        
@@ -251,11 +252,13 @@
                     end
        block_body = body ? extract_content(body) : ''
        
+       # Format block args - test expects {|p| format (no space after {)
+       block_args_formatted = block_args.empty? ? '' : "|#{block_args}|"
        if receiver_str.empty?
          method_args_str = method_args.map { |a| extract_content(a) }.join(', ')
-         "#{method_name}(#{method_args_str}) { |#{block_args}| #{block_body} }"
+         "#{method_name}(#{method_args_str}) {#{block_args_formatted} #{block_body} }"
        else
-         "#{receiver_str}.#{method_name} { |#{block_args}| #{block_body} }"
+         "#{receiver_str}.#{method_name} {#{block_args_formatted} #{block_body} }"
        end
      end
 
