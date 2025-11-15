@@ -583,11 +583,33 @@
             # Check if all parts are :str (no interpolation)
             all_static = args.first.children.all? { |child| child.type == :str }
             if all_static
-              # Extract all string parts and join them, removing backslash escapes
-              content = args.first.children.map { |child| child.children[0] }.join.gsub('\\', '')
-              # Format with proper indentation
-              content = content.split("\n").map.with_index { |line, i| i == 0 ? line : "        #{line}" }.join("\n")
-              add_line(content, :process_send)
+              # Extract all string parts and join them
+              parts = args.first.children.map { |child| child.children[0] }
+              content = parts.join
+              # Handle backslash escapes that continue lines
+              # If a line ends with { and the next line starts with }, join them
+              lines = content.split("\n")
+              processed_lines = []
+              i = 0
+              while i < lines.length
+                if lines[i].end_with?('{') && i + 1 < lines.length && lines[i + 1].start_with?('}')
+                  # Join lines (backslash escape removed the newline)
+                  processed_lines << lines[i] + lines[i + 1]
+                  i += 2
+                else
+                  processed_lines << lines[i]
+                  i += 1
+                end
+              end
+              # Format with proper indentation (2 spaces for continuation lines, but not for closing tags)
+              formatted = processed_lines.map.with_index do |line, i|
+                if i == 0 || line.strip.start_with?('</')
+                  line
+                else
+                  "  #{line}"
+                end
+              end.join("\n")
+              add_line(formatted, :process_send)
             else
               # Has interpolation, use ERB tags
               content = extract_dstr(args.first)
