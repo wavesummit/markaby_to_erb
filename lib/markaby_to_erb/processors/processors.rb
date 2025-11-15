@@ -438,11 +438,18 @@
         hash_count = args.count { |arg| arg.type == :hash }
         arguments = args.map.with_index do |arg, index|
           if arg.type == :hash
-            # For hash arguments, don't wrap in curly braces if it's the last argument
-            # AND it's the only hash argument (Ruby allows :key => value syntax without braces)
-            # But if there are multiple hash arguments, keep braces on all of them
+            # Check if hash contains nested hashes (complex structure)
+            has_nested_hash = arg.children.any? do |pair|
+              pair.children[1] && pair.children[1].type == :hash
+            end
+            
+            # For hash arguments, don't wrap in curly braces only if:
+            # 1. It's the last argument
+            # 2. It's the only hash argument
+            # 3. It doesn't contain nested hashes
+            # Otherwise, keep the braces for clarity
             is_last = (index == args.length - 1)
-            should_wrap = hash_count > 1 || !is_last
+            should_wrap = hash_count > 1 || !is_last || has_nested_hash
             extract_content_for_hash(arg, should_wrap)
           elsif [:str, :dstr].include?(arg.type)
             "\"#{extract_content(arg)}\""
