@@ -4,6 +4,34 @@
       def process_if(node)
         condition_node, if_body, else_body = node.children
 
+        # Check if this is a ternary operator (both branches are simple expressions)
+        # Ternary: condition ? true_value : false_value
+        is_ternary = if_body && else_body && 
+                     ![:begin, :if, :while, :until, :rescue, :kwbegin].include?(if_body.type) &&
+                     ![:begin, :if, :while, :until, :rescue, :kwbegin].include?(else_body.type)
+        
+        if is_ternary
+          # Output as ternary operator
+          # Unwrap :begin nodes in condition
+          condition_str = if condition_node.type == :begin
+                           extract_content(condition_node.children[0])
+                         else
+                           extract_content(condition_node)
+                         end
+          true_str = if if_body.type == :str
+                      "'#{extract_content(if_body)}'"
+                    else
+                      extract_content(if_body)
+                    end
+          false_str = if else_body.type == :str
+                       "'#{extract_content(else_body)}'"
+                     else
+                       extract_content(else_body)
+                     end
+          add_line("<% #{condition_str} ? #{true_str} : #{false_str} %>", :process_if)
+          return
+        end
+
         # Handle modifier forms like "retry if condition"
         if if_body&.type == :retry || if_body&.type == :redo || if_body&.type == :break || if_body&.type == :next
           add_line("<% if #{extract_content(condition_node)} %>", :process_if)
@@ -401,7 +429,7 @@
         end
       end
 
-      def process_method(node)
+      def process_method(node, statement_context: false)
         receiver, method_name, *args = node.children
         arguments = args.map do |arg|
           [:str, :dstr].include?(arg.type) ? "\"#{extract_content(arg)}\"" : extract_content(arg)
@@ -416,7 +444,12 @@
                          end
 
         result = [method_call_str, arguments].reject { |a| a.empty? }.join(' ')
-        erb_code = "<%= #{result} %>"
+        # If it's a statement context and has no arguments, use <% instead of <%=
+        erb_code = if statement_context && arguments.empty? && receiver_str.empty?
+                     "<% #{result} %>"
+                   else
+                     "<%= #{result} %>"
+                   end
         add_line(erb_code, :process_method)
       end
 
@@ -550,7 +583,8 @@
           arg_str = args.map { |arg| extract_content(arg) }.join(', ')
           add_line("<% #{receiver_str} << #{arg_str} %>", :process_send)
         elsif function_call?(node)
-          process_method(node)
+          # Method calls in statement context (not inside tags) should use <% not <%=
+          process_method(node, statement_context: true)
         else
           # Handle variable references
           add_line("<%= #{method_name} %>", :process_send)

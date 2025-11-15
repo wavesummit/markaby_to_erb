@@ -290,17 +290,35 @@
          return "#{receiver_str} + #{arg_str}"
        end
 
-       # handle math operations
-       if %i[+ * \ % -].include?(method_name) && receiver && receiver.type == :send
-         receiver_str = receiver ? extract_content(receiver) : ''
-         arg_str = arguments.map do |arg|
-           arg.type == :str ? "'#{extract_content(arg)}'" : extract_content(arg)
-         end.join
-         return "#{receiver_str} #{method_name} #{arg_str}"
-       end
+      # Special handling for % operator (string formatting)
+      if method_name == :% && receiver && (receiver.type == :str || receiver.type == :dstr)
+        receiver_str = if receiver.type == :str
+                         "\"#{extract_content(receiver)}\""
+                       else
+                         extract_dstr(receiver)
+                       end
+        arg_str = arguments.map { |arg| extract_content(arg) }.join(', ')
+        return "#{receiver_str} % #{arg_str}"
+      end
+
+      # handle math operations
+      if %i[+ * \ % -].include?(method_name) && receiver && receiver.type == :send
+        receiver_str = receiver ? extract_content(receiver) : ''
+        arg_str = arguments.map do |arg|
+          arg.type == :str ? "'#{extract_content(arg)}'" : extract_content(arg)
+        end.join
+        return "#{receiver_str} #{method_name} #{arg_str}"
+      end
 
       # Normal method call processing
-      receiver_str = receiver ? extract_content(receiver) : ''
+      # Special handling for method calls on dstr (like "string".html_safe)
+      if receiver && receiver.type == :dstr
+        dstr_content = extract_dstr(receiver)
+        receiver_str = dstr_content
+      else
+        receiver_str = receiver ? extract_content(receiver) : ''
+      end
+      
       arguments_str = arguments.map do |arg|
         if arg.type == :block_pass
           # Handle &:method syntax (symbol-to-proc)
