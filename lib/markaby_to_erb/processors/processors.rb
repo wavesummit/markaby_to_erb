@@ -28,7 +28,7 @@
                      else
                        extract_content(else_body)
                      end
-          add_line("<% #{condition_str} ? #{true_str} : #{false_str} %>", :process_if)
+          add_line("<% #{condition_str} ? #{true_str}:#{false_str} %>", :process_if)
           return
         end
 
@@ -385,6 +385,9 @@
             # Handle blocks (e.g., (1..15).collect { |n| [n, n] })
             if value_node.type == :block
               value = extract_block_expression(value_node)
+            elsif value_node.type == :dstr
+              # Preserve quotes for dstr in assignments
+              value = extract_dstr(value_node)
             else
               value = extract_content(value_node)
             end
@@ -537,6 +540,25 @@
               # Handle dynamic strings with interpolation
               dstr_content = extract_dstr(arg)
               "<%= #{dstr_content} %>"
+            when :if
+              # Handle ternary operators in tag content
+              condition, if_body, else_body = arg.children
+              condition_str = if condition && condition.type == :begin
+                               extract_content(condition.children[0])
+                             else
+                               extract_content(condition)
+                             end
+              true_str = if if_body && if_body.type == :str
+                          "'#{extract_content(if_body)}'"
+                        else
+                          extract_content(if_body)
+                        end
+              false_str = if else_body && else_body.type == :str
+                           "'#{extract_content(else_body)}'"
+                         else
+                           extract_content(else_body)
+                         end
+              "<%= #{condition_str} ? #{true_str} : #{false_str} %>"
             else
               extract_content(arg)
             end
@@ -557,13 +579,29 @@
         elsif method_name == :text && args.any?
           # Directly add the text content without ERB tags
           if args.first.type == :dstr
-            # Call process_dstr here to handle dynamic strings
-            content = extract_dstr(args.first)
-            add_line("<%= #{content} %>", :process_send)
+            # For dstr with only static string parts (no interpolation), output directly
+            # Check if all parts are :str (no interpolation)
+            all_static = args.first.children.all? { |child| child.type == :str }
+            if all_static
+              # Extract all string parts and join them, removing backslash escapes
+              content = args.first.children.map { |child| child.children[0] }.join.gsub('\\', '')
+              # Format with proper indentation
+              content = content.split("\n").map.with_index { |line, i| i == 0 ? line : "        #{line}" }.join("\n")
+              add_line(content, :process_send)
+            else
+              # Has interpolation, use ERB tags
+              content = extract_dstr(args.first)
+              add_line("<%= #{content} %>", :process_send)
+            end
           elsif variable?(args.first) || function_call?(args.first)
             # Call process_dstr here to handle dynamic strings
             content = extract_content(args.first)
             add_line("<%= #{content} %>", :process_send)
+          elsif args.first.type == :str
+            # For static strings, output directly without ERB tags
+            # Remove backslash escapes and preserve newlines
+            content = args.first.children[0].gsub('\\', '').gsub("\n", "\n        ")
+            add_line(content, :process_send)
           else
             content = args.map { |arg| extract_content(arg) }.join
             add_line(content, :process_send)

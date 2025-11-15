@@ -117,9 +117,26 @@
       when :dstr
         extract_content_for_dstr(node)
       when :if
-        # Handle `if` statements
+        # Handle `if` statements (including ternary operators)
         condition, if_body, else_body = node.children
-        "#{extract_content(condition)} ? #{extract_content(if_body)} : #{extract_content(else_body)}"
+        # Unwrap :begin nodes in condition
+        condition_str = if condition && condition.type == :begin
+                         extract_content(condition.children[0])
+                       else
+                         extract_content(condition)
+                       end
+        # Preserve quotes on string literals in ternary operators
+        true_str = if if_body && if_body.type == :str
+                    "'#{extract_content(if_body)}'"
+                  else
+                    extract_content(if_body)
+                  end
+        false_str = if else_body && else_body.type == :str
+                     "'#{extract_content(else_body)}'"
+                   else
+                     extract_content(else_body)
+                   end
+        "#{condition_str} ? #{true_str}:#{false_str}"
       when :or, :and
         extract_content_for_operators(node)
       else
@@ -277,18 +294,26 @@
          return "t('#{extract_content(arguments[0])}')"
        end
 
-       # Special handling for string concatenation with +
-       if method_name == :+ && (receiver.type == :str || arguments[0].type == :str || arguments[0].type == :dstr)
-         receiver_str = receiver.type == :str ? "'#{extract_content(receiver)}'" : extract_content(receiver)
-         arg_str = if arguments[0].type == :str
-                     "'#{extract_content(arguments[0]).gsub("\n", '\\n')}'"
-                   elsif arguments[0].type == :dstr
-                     "\"#{extract_content(arguments[0]).gsub("\n", '\\n')}\""
-                   else
-                     extract_content(arguments[0])
-                   end
-         return "#{receiver_str} + #{arg_str}"
-       end
+      # Special handling for + operator (string concatenation and array addition)
+      if method_name == :+
+        # Handle string concatenation
+        if receiver.type == :str || arguments[0]&.type == :str || arguments[0]&.type == :dstr
+          receiver_str = receiver.type == :str ? "'#{extract_content(receiver)}'" : extract_content(receiver)
+          arg_str = if arguments[0].type == :str
+                      "'#{extract_content(arguments[0]).gsub("\n", '\\n')}'"
+                    elsif arguments[0].type == :dstr
+                      "\"#{extract_content(arguments[0]).gsub("\n", '\\n')}\""
+                    else
+                      extract_content(arguments[0])
+                    end
+          return "#{receiver_str} + #{arg_str}"
+        # Handle array addition (e.g., ["Visa"]+["MasterCard"])
+        elsif receiver.type == :array || arguments[0]&.type == :array
+          receiver_str = extract_content(receiver)
+          arg_str = extract_content(arguments[0])
+          return "#{receiver_str}+#{arg_str}"
+        end
+      end
 
       # Special handling for % operator (string formatting)
       if method_name == :% && receiver && (receiver.type == :str || receiver.type == :dstr)
