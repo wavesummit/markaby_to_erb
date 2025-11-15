@@ -4,6 +4,16 @@
       def process_if(node)
         condition_node, if_body, else_body = node.children
 
+        # Handle modifier forms like "retry if condition"
+        if if_body&.type == :retry || if_body&.type == :redo || if_body&.type == :break || if_body&.type == :next
+          add_line("<% if #{extract_content(condition_node)} %>", :process_if)
+          indent do
+            process_node(if_body)
+          end
+          add_line("<% end %>", :process_if)
+          return
+        end
+
         # Check if else_body is an :if node (indicating an elsif)
         if else_body&.type == :if
           # Handle if-elsif chain
@@ -66,6 +76,12 @@
           process_if(node)
         when :begin
           process_begin(node)
+        when :kwbegin
+          process_kwbegin(node)
+        when :rescue
+          process_rescue(node)
+        when :resbody
+          process_resbody(node)
         when :op_asgn
           process_op_asgn(node)
         when :str
@@ -78,6 +94,18 @@
           process_case(node)
         when :next
           process_next(node)
+        when :while
+          process_while(node)
+        when :until
+          process_until(node)
+        when :for
+          process_for(node)
+        when :break
+          process_break(node)
+        when :redo
+          process_redo(node)
+        when :retry
+          process_retry(node)
         else
           puts "Unhandled node type: #{node.type}"
         end
@@ -88,19 +116,145 @@
       end
 
       def process_begin(node)
-        node.children.each do |child|
-          process_node(child)
+        # Check if this begin node has rescue clauses
+        # A begin node with rescue has: [body, resbody1, resbody2, ...]
+        has_rescue = node.children.any? { |child| child&.type == :resbody }
+        
+        if has_rescue
+          # First child is the main body
+          body = node.children[0]
+          # Remaining children are rescue clauses
+          rescue_clauses = node.children[1..-1]
+          
+          add_line("<% begin %>", :process_begin)
+          indent do
+            process_node(body) if body
+          end
+          
+          rescue_clauses.each do |rescue_clause|
+            if rescue_clause&.type == :resbody
+              # resbody structure: [exception_list, exception_var, body]
+              exception_list, exception_var, rescue_body = rescue_clause.children
+              
+              rescue_line = "<% rescue"
+              if exception_list
+                exception_str = exception_list.children.map { |e| extract_content(e) }.join(', ')
+                rescue_line += " #{exception_str}"
+              end
+              if exception_var
+                rescue_line += " => #{extract_content(exception_var)}"
+              end
+              rescue_line += " %>"
+              
+              add_line(rescue_line, :process_begin)
+              indent do
+                process_node(rescue_body) if rescue_body
+              end
+            end
+          end
+          
+          add_line("<% end %>", :process_begin)
+        else
+          # Regular begin block without rescue - just process children
+          node.children.each do |child|
+            process_node(child)
+          end
+        end
+      end
+
+      def process_kwbegin(node)
+        # kwbegin is used for begin/end blocks (as opposed to { } blocks)
+        # It can contain rescue clauses
+        if node.children.first&.type == :rescue
+          # If first child is rescue, process it
+          process_rescue(node.children.first)
+        else
+          # Otherwise, process as regular begin
+          add_line("<% begin %>", :process_kwbegin)
+          indent do
+            node.children.each do |child|
+              process_node(child)
+            end
+          end
+          add_line("<% end %>", :process_kwbegin)
+        end
+      end
+
+      def process_rescue(node)
+        # rescue structure: [body, resbody1, resbody2, ..., else_clause]
+        # body is the main code block
+        # resbody nodes are rescue clauses
+        # last child might be an else clause
+        body = node.children[0]
+        rescue_clauses = node.children[1..-1].select { |c| c&.type == :resbody }
+        else_clause = node.children.last if node.children.last&.type != :resbody
+        
+        add_line("<% begin %>", :process_rescue)
+        indent do
+          process_node(body) if body
+        end
+        
+        rescue_clauses.each do |rescue_clause|
+          process_resbody(rescue_clause)
+        end
+        
+        if else_clause
+          add_line("<% else %>", :process_rescue)
+          indent do
+            process_node(else_clause)
+          end
+        end
+        
+        add_line("<% end %>", :process_rescue)
+      end
+
+      def process_resbody(node)
+        # resbody structure: [exception_list, exception_var, body]
+        exception_list, exception_var, rescue_body = node.children
+        
+        rescue_line = "<% rescue"
+        if exception_list
+          exception_str = exception_list.children.map { |e| extract_content(e) }.join(', ')
+          rescue_line += " #{exception_str}"
+        end
+        if exception_var
+          # exception_var can be :ivasgn, :lvasgn, or a variable node
+          var_name = if exception_var.type == :ivasgn || exception_var.type == :lvasgn
+                       exception_var.children[0].to_s
+                     else
+                       extract_content(exception_var)
+                     end
+          rescue_line += " => #{var_name}"
+        end
+        rescue_line += " %>"
+        
+        add_line(rescue_line, :process_resbody)
+        indent do
+          process_node(rescue_body) if rescue_body
         end
       end
 
       def process_op_asgn(node)
-        variable = extract_content(node.children[0])
+        # For :op_asgn, children are: [variable_node, operator, value_node]
+        variable_node = node.children[0]
         operator = node.children[1]
-        value = extract_content(node.children[2])
+        value_node = node.children[2]
+        
+        # Extract variable name directly from the node
+        # Handle both :ivar/:lvar (variable reference) and :ivasgn/:lvasgn (assignment target)
+        variable = if variable_node.type == :ivar || variable_node.type == :lvar
+                     variable_node.children[0].to_s
+                   elsif variable_node.type == :ivasgn || variable_node.type == :lvasgn
+                     variable_node.children[0].to_s
+                   else
+                     extract_content(variable_node)
+                   end
+        
+        value = extract_content(value_node)
 
         # Format the value with parentheses if it's a complex expression
-        formatted_value = node.children[2].type == :begin ? "( #{value} )" : value
-        formatted_value = "\"#{value}\"" if node.children[2].type == :str
+        formatted_value = value_node.type == :begin ? "( #{value} )" : value
+        formatted_value = "\"#{value}\"" if value_node.type == :str
 
         # Remove any extra spaces at beginning of lines and fix string concatenation
         formatted_value = formatted_value.strip
@@ -115,6 +269,69 @@
           add_line("<% next if #{condition_str} %>", :process_next)
         else
           add_line("<% next %>", :process_next)
+        end
+      end
+
+      def process_while(node)
+        condition, body = node.children
+        condition_str = extract_content(condition)
+        add_line("<% while #{condition_str} %>", :process_while)
+        indent do
+          process_node(body) if body
+        end
+        add_line("<% end %>", :process_while)
+      end
+
+      def process_until(node)
+        condition, body = node.children
+        condition_str = extract_content(condition)
+        add_line("<% until #{condition_str} %>", :process_until)
+        indent do
+          process_node(body) if body
+        end
+        add_line("<% end %>", :process_until)
+      end
+
+      def process_for(node)
+        # for item in collection
+        # node.children: [variable, collection, body]
+        variable, collection, body = node.children
+        var_name = variable.children[0].to_s
+        collection_str = extract_content(collection)
+        add_line("<% for #{var_name} in #{collection_str} %>", :process_for)
+        indent do
+          process_node(body) if body
+        end
+        add_line("<% end %>", :process_for)
+      end
+
+      def process_break(node)
+        condition = node.children[0]
+        if condition
+          condition_str = extract_content(condition)
+          add_line("<% break if #{condition_str} %>", :process_break)
+        else
+          add_line("<% break %>", :process_break)
+        end
+      end
+
+      def process_redo(node)
+        condition = node.children[0]
+        if condition
+          condition_str = extract_content(condition)
+          add_line("<% redo if #{condition_str} %>", :process_redo)
+        else
+          add_line("<% redo %>", :process_redo)
+        end
+      end
+
+      def process_retry(node)
+        condition = node.children[0]
+        if condition
+          condition_str = extract_content(condition)
+          add_line("<% retry if #{condition_str} %>", :process_retry)
+        else
+          add_line("<% retry %>", :process_retry)
         end
       end
 
@@ -137,7 +354,12 @@
           if value_node.type == :op_asgn
             process_op_asgn(value_node)
           else
-            value = extract_content(value_node)
+            # Handle blocks (e.g., (1..15).collect { |n| [n, n] })
+            if value_node.type == :block
+              value = extract_block_expression(value_node)
+            else
+              value = extract_content(value_node)
+            end
 
             # Ensure strings are properly quoted
             value = "\"#{value}\"" if value_node.type == :str
@@ -152,13 +374,48 @@
         end
       end
 
+      def extract_block_expression(node)
+        # node is a :block type with children: [method_call, args, body]
+        method_call, args, body = node.children
+        receiver, method_name, *method_args = method_call.children
+        
+        # Extract receiver chain (e.g., (1..15)) - use extract_content which handles ranges
+        receiver_str = receiver ? extract_content(receiver) : ''
+        
+        # Extract block arguments (e.g., |n|)
+        block_args = if args && args.type == :args
+                       args.children.map { |arg| arg.children[0].to_s }.join(', ')
+                     else
+                       ''
+                     end
+        
+        # Extract block body (e.g., [n, n])
+        block_body = body ? extract_content(body) : ''
+        
+        # Build the expression: receiver.method { |args| body }
+        if receiver_str.empty?
+          method_args_str = method_args.map { |a| extract_content(a) }.join(', ')
+          "#{method_name}(#{method_args_str}) { |#{block_args}| #{block_body} }"
+        else
+          "#{receiver_str}.#{method_name} { |#{block_args}| #{block_body} }"
+        end
+      end
+
       def process_method(node)
         receiver, method_name, *args = node.children
         arguments = args.map do |arg|
           [:str, :dstr].include?(arg.type) ? "\"#{extract_content(arg)}\"" : extract_content(arg)
         end.join(', ')
 
-        result = [method_name, arguments].reject { |a| a.empty? }.join(' ')
+        # Build the method call with receiver if present
+        receiver_str = receiver ? extract_content(receiver) : ''
+        method_call_str = if receiver_str.empty?
+                           method_name.to_s
+                         else
+                           "#{receiver_str}.#{method_name}"
+                         end
+
+        result = [method_call_str, arguments].reject { |a| a.empty? }.join(' ')
         erb_code = "<%= #{result} %>"
         add_line(erb_code, :process_method)
       end
@@ -243,6 +500,10 @@
             case arg.type
             when :lvar, :send
               "<%= #{extract_content(arg)} %>"
+            when :dstr
+              # Handle dynamic strings with interpolation
+              dstr_content = extract_dstr(arg)
+              "<%= #{dstr_content} %>"
             else
               extract_content(arg)
             end
@@ -253,7 +514,7 @@
             if self_closing_tag?(html_tag)
               add_line("<#{html_tag}#{attributes}>", :process_send1)
             else
-              add_line("<#{html_tag}#{attributes}/>", :process_send)
+              add_line("<#{html_tag}#{attributes}></#{html_tag}>", :process_send)
             end
           else
             # Add the opening tag and content in the same line if there's no nested block.
@@ -283,6 +544,11 @@
         elsif method_name == :end_form
           add_line("</form>", :process_send)
 
+        elsif method_name == :<<
+          # Handle << operator (shovel operator) as a statement, not output
+          receiver_str = receiver ? extract_content(receiver) : ''
+          arg_str = args.map { |arg| extract_content(arg) }.join(', ')
+          add_line("<% #{receiver_str} << #{arg_str} %>", :process_send)
         elsif function_call?(node)
           process_method(node)
         else

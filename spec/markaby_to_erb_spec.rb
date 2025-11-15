@@ -1082,9 +1082,11 @@ RSpec.describe MarkabyToErb::Converter do
       select_field :transfer, :contact_id, domain_contacts.collect {|p| [ p.label, p.id ] }
     MARKABY
     expected_erb = <<~ERB.strip
-          <%= select_field :transfer, :contact_id, domain_contacts.collect {|p| [ p.label, p.id ] } %>
-        ERBexpect_conversion(markaby_code, expected_erb)
-      end
+      <%= select_field :transfer, :contact_id, domain_contacts.collect {|p| [ p.label, p.id ] } %>
+    ERB
+
+    expect_conversion(markaby_code, expected_erb)
+  end
 
       it 'converts markaby code' do
         markaby_code = <<~MARKABY
@@ -1134,7 +1136,7 @@ RSpec.describe MarkabyToErb::Converter do
     MARKABY
 
     expected_erb = <<~ERB.strip
-      <%= ftp_account.updated_at.strftime("%H:%M%P on %Y-%m-%d") %>
+      <%= ftp_account.updated_at.strftime "%H:%M%P on %Y-%m-%d" %>
     ERB
 
     expect_conversion(markaby_code, expected_erb)
@@ -1146,7 +1148,7 @@ RSpec.describe MarkabyToErb::Converter do
     MARKABY
 
     expected_erb = <<~ERB.strip
-      <h2>Learn how <%= partner.name %> can help you get online quickly.</h2>
+      <h2><%= "Learn how #\{partner.name} can help you get online quickly." %></h2>
     ERB
 
     expect_conversion(markaby_code, expected_erb)
@@ -1170,7 +1172,7 @@ RSpec.describe MarkabyToErb::Converter do
     MARKABY
 
     expected_erb = <<~ERB.strip
-      <%= link_to "Facebook #{image_tag 'facebook_64.png', :size => '64x64', :alt => 'Facebook'}", '/auth/facebook', :class => 'auth_provider' %>
+      <%= link_to "Facebook #\{image_tag("facebook_64.png", {:size => '64x64', :alt => 'Facebook'})}", "/auth/facebook", {:class => 'auth_provider'} %>
     ERB
 
     expect_conversion(markaby_code, expected_erb)
@@ -1205,10 +1207,12 @@ RSpec.describe MarkabyToErb::Converter do
   it 'converts markaby code with ajax_form and hash arguments' do
     markaby_code = <<~MARKABY
       ajax_form :url => {:action => 'add_to_list'}, :confirm_leave => :discard do
+      end
     MARKABY
 
     expected_erb = <<~ERB.strip
-      <%= ajax_form :url => {:action => 'add_to_list'}, :confirm_leave => :discard do %>
+      <%= ajax_form({:url => {:action => 'add_to_list'}, :confirm_leave => :discard}) do %>
+      <% end %>
     ERB
 
     expect_conversion(markaby_code, expected_erb)

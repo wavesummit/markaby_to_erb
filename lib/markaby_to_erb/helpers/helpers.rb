@@ -4,7 +4,8 @@ module MarkabyToErb
       %w[html head title body h1 h2 h3 h4 h5 h6 ul ol li a div span p
          table tr td th form input label select option
          textarea button meta br hr img link tbody thead
-         hgroup i iframe object pre video tfoot dt em fieldset strong].include?(method_name.to_s)
+         hgroup i iframe object pre video tfoot dt em fieldset strong
+         blockquote code].include?(method_name.to_s)
     end
 
     def iteration_method?(method_name)

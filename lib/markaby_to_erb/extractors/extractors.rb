@@ -94,27 +94,37 @@
          node.children[0].to_s
        when :lvar, :cvar, :ivar, :gvar
          node.children[0].to_s
-       when :begin
-         # assuming only one child
-         extract_content(node.children[0])
-       when :hash
-         extract_content_for_hash(node)
-       when :array
-         # Properly format array elements
-         extract_content_for_array(node)
-       when :send
-         extract_content_for_send(node)
-       when :dstr
-         extract_content_for_dstr(node)
-       when :if
-         # Handle `if` statements
-         condition, if_body, else_body = node.children
-         "#{extract_content(condition)} ? #{extract_content(if_body)} : #{extract_content(else_body)}"
-       when :or, :and
-         extract_content_for_operators(node)
-       else
-         ''
-       end
+      when :begin
+        # assuming only one child
+        extract_content(node.children[0])
+      when :irange, :erange
+        # Handle ranges like 1..15 or 1...15
+        start_node = node.children[0]
+        end_node = node.children[1]
+        start_str = extract_content(start_node)
+        end_str = extract_content(end_node)
+        range_op = node.type == :erange ? '...' : '..'
+        "(#{start_str}#{range_op}#{end_str})"
+      when :hash
+        extract_content_for_hash(node)
+      when :array
+        # Properly format array elements
+        extract_content_for_array(node)
+      when :send
+        extract_content_for_send(node)
+      when :block
+        extract_content_for_block(node)
+      when :dstr
+        extract_content_for_dstr(node)
+      when :if
+        # Handle `if` statements
+        condition, if_body, else_body = node.children
+        "#{extract_content(condition)} ? #{extract_content(if_body)} : #{extract_content(else_body)}"
+      when :or, :and
+        extract_content_for_operators(node)
+      else
+        ''
+      end
      end
 
      def extract_content_for_operators(node)
@@ -201,8 +211,35 @@
        "[#{array_content}]"
      end
 
+     def extract_content_for_block(node)
+       # Extract block expression like method { |args| body }
+       method_call, args, body = node.children
+       receiver, method_name, *method_args = method_call.children
+       
+       receiver_str = receiver ? extract_content(receiver) : ''
+       block_args = if args && args.type == :args
+                      args.children.map { |arg| arg.children[0].to_s }.join(', ')
+                    else
+                      ''
+                    end
+       block_body = body ? extract_content(body) : ''
+       
+       if receiver_str.empty?
+         method_args_str = method_args.map { |a| extract_content(a) }.join(', ')
+         "#{method_name}(#{method_args_str}) { |#{block_args}| #{block_body} }"
+       else
+         "#{receiver_str}.#{method_name} { |#{block_args}| #{block_body} }"
+       end
+     end
+
      def extract_content_for_send(node)
        receiver, method_name, *arguments = node.children
+
+       # Special handling for ! operator (negation)
+       if method_name == :! && receiver
+         receiver_str = extract_content(receiver)
+         return "!#{receiver_str}"
+       end
 
        # Special handling for comparison operators
        if %i[> < >= <= == !=].include?(method_name)
@@ -262,16 +299,31 @@
          return "#{receiver_str} #{method_name} #{arg_str}"
        end
 
-       # Normal method call processing
-       receiver_str = receiver ? extract_content(receiver) : ''
-       arguments_str = arguments.map { |arg| extract_content(arg) }.join(', ')
+      # Normal method call processing
+      receiver_str = receiver ? extract_content(receiver) : ''
+      arguments_str = arguments.map do |arg|
+        if arg.type == :block_pass
+          # Handle &:method syntax (symbol-to-proc)
+          symbol_node = arg.children[0]
+          if symbol_node.type == :sym
+            "&:#{symbol_node.children[0]}"
+          else
+            "&:#{extract_content(symbol_node)}"
+          end
+        elsif arg.type == :str
+          # Quote string arguments
+          "\"#{extract_content(arg)}\""
+        else
+          extract_content(arg)
+        end
+      end.join(', ')
 
-       # Build the final method call string
-       if receiver_str.empty?
-         method_name.to_s + (arguments_str.empty? ? '' : "(#{arguments_str})")
-       else
-         receiver_str + '.' + method_name.to_s + (arguments_str.empty? ? '' : "(#{arguments_str})")
-       end
+      # Build the final method call string
+      if receiver_str.empty?
+        method_name.to_s + (arguments_str.empty? ? '' : "(#{arguments_str})")
+      else
+        receiver_str + '.' + method_name.to_s + (arguments_str.empty? ? '' : "(#{arguments_str})")
+      end
      end
 
      def extract_argument_recursive(node)
@@ -292,12 +344,17 @@
            key, value = pair.children
            key_str = key.children[0].to_s.gsub(':', '')
 
-           if value.type == :dstr
-             value_str = "<%=\"#{extract_content(value)}\"%>"
-           else
-             value_str = extract_content(value)
-           end
-           "#{key_str}=\"#{value_str}\""
+          if value.type == :dstr
+            # For dynamic strings, extract properly and use ERB interpolation
+            dstr_content = extract_dstr(value)
+            value_str = "<%=\"#{dstr_content.gsub('"', '')}\"%>"
+          elsif value.type == :send || value.type == :lvar || value.type == :ivar || value.type == :cvar || value.type == :gvar
+            # For method calls and variables, wrap in ERB tags
+            value_str = "<%= #{extract_content(value)} %>"
+          else
+            value_str = extract_content(value)
+          end
+          "#{key_str}=\"#{value_str}\""
          end
        end
 
