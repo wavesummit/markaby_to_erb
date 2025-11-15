@@ -434,8 +434,21 @@
 
       def process_method(node, statement_context: false)
         receiver, method_name, *args = node.children
-        arguments = args.map do |arg|
-          [:str, :dstr].include?(arg.type) ? "\"#{extract_content(arg)}\"" : extract_content(arg)
+        # Count how many hash arguments we have
+        hash_count = args.count { |arg| arg.type == :hash }
+        arguments = args.map.with_index do |arg, index|
+          if arg.type == :hash
+            # For hash arguments, don't wrap in curly braces if it's the last argument
+            # AND it's the only hash argument (Ruby allows :key => value syntax without braces)
+            # But if there are multiple hash arguments, keep braces on all of them
+            is_last = (index == args.length - 1)
+            should_wrap = hash_count > 1 || !is_last
+            extract_content_for_hash(arg, should_wrap)
+          elsif [:str, :dstr].include?(arg.type)
+            "\"#{extract_content(arg)}\""
+          else
+            extract_content(arg)
+          end
         end.join(', ')
 
         # Build the method call with receiver if present
@@ -446,7 +459,18 @@
                            "#{receiver_str}.#{method_name}"
                          end
 
-        result = [method_call_str, arguments].reject { |a| a.empty? }.join(' ')
+        # Build the method call
+        # Only add parentheses if there are multiple hash arguments (for clarity)
+        # or if the arguments contain complex structures
+        if arguments.empty?
+          result = method_call_str
+        elsif hash_count > 1
+          # Multiple hash arguments - use parentheses for clarity
+          result = "#{method_call_str}(#{arguments})"
+        else
+          # Single argument or simple arguments - no parentheses (Ruby style)
+          result = "#{method_call_str} #{arguments}"
+        end
         # If it's a statement context and has no arguments, use <% instead of <%=
         erb_code = if statement_context && arguments.empty? && receiver_str.empty?
                      "<% #{result} %>"
@@ -520,6 +544,8 @@
           if args.size == 1 && args[0]&.type == :hash
             add_line("<%= #{method_name} #{extract_content_for_hash(args[0], false)} %>", :process_send)
           else
+            # For helper calls with multiple arguments, process through process_method
+            # but ensure hash arguments don't get wrapped in curly braces
             process_method(node)
           end
 
@@ -642,6 +668,21 @@
           receiver_str = receiver ? extract_content(receiver) : ''
           arg_str = args.map { |arg| extract_content(arg) }.join(', ')
           add_line("<% #{receiver_str} << #{arg_str} %>", :process_send)
+        elsif method_name == :+
+          # Handle + operator (string concatenation) in block bodies
+          # Check if this is string concatenation
+          receiver_is_str = receiver && (receiver.type == :str || receiver.type == :dstr)
+          arg_is_str = args[0] && (args[0].type == :str || args[0].type == :dstr)
+          receiver_is_plus = receiver && receiver.type == :send && receiver.children[1] == :+
+          
+          if receiver_is_str || arg_is_str || receiver_is_plus
+            # Extract the concatenation expression
+            content = extract_content(node)
+            add_line("<%= #{content} %>", :process_send)
+          else
+            # Not string concatenation, process as normal method call
+            process_method(node)
+          end
         elsif function_call?(node)
           # Method calls in statement context (not inside tags) should use <% not <%=
           process_method(node, statement_context: true)

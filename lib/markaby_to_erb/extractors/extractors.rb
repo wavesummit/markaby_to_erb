@@ -86,8 +86,18 @@
          node.children[0].to_i.to_s
        when :float
          node.children[0].to_f.to_s
-       when :const
-         node.children[1].to_s
+      when :const
+        # Handle namespaced constants like Date::ABBR_MONTHNAMES
+        # Structure: s(:const, parent_const, constant_name)
+        parent = node.children[0]
+        constant_name = node.children[1].to_s
+        if parent && parent.type == :const
+          # Recursively extract the parent namespace
+          parent_str = extract_content(parent)
+          "#{parent_str}::#{constant_name}"
+        else
+          constant_name
+        end
        when :sym
          ":#{node.children[0]}"
        when :lvasgn
@@ -297,8 +307,23 @@
       # Special handling for + operator (string concatenation and array addition)
       if method_name == :+
         # Handle string concatenation
-        if receiver.type == :str || arguments[0]&.type == :str || arguments[0]&.type == :dstr
-          receiver_str = receiver.type == :str ? "'#{extract_content(receiver)}'" : extract_content(receiver)
+        # Check if either side is a string (receiver or argument)
+        # Also handle nested + operations where the receiver might be another + operation
+        receiver_is_str = receiver && (receiver.type == :str || receiver.type == :dstr)
+        receiver_is_plus = receiver && receiver.type == :send && receiver.children[1] == :+
+        arg_is_str = arguments[0] && (arguments[0].type == :str || arguments[0].type == :dstr)
+        
+        if receiver_is_str || arg_is_str || receiver_is_plus
+          receiver_str = if receiver.type == :str
+                          "'#{extract_content(receiver)}'"
+                        elsif receiver.type == :dstr
+                          extract_dstr(receiver)
+                        elsif receiver_is_plus
+                          # Recursively extract nested + operations
+                          extract_content(receiver)
+                        else
+                          extract_content(receiver)
+                        end
           arg_str = if arguments[0].type == :str
                       "'#{extract_content(arguments[0]).gsub("\n", '\\n')}'"
                     elsif arguments[0].type == :dstr
@@ -308,7 +333,7 @@
                     end
           return "#{receiver_str} + #{arg_str}"
         # Handle array addition (e.g., ["Visa"]+["MasterCard"])
-        elsif receiver.type == :array || arguments[0]&.type == :array
+        elsif receiver && (receiver.type == :array || arguments[0]&.type == :array)
           receiver_str = extract_content(receiver)
           arg_str = extract_content(arguments[0])
           return "#{receiver_str}+#{arg_str}"
