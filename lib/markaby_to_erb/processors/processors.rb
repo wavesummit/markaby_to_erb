@@ -1,14 +1,30 @@
   module MarkabyToErb
     module Processors
 
+      def contains_html_or_helper?(node)
+        return false unless node
+        case node.type
+        when :send
+          method_name = node.children[1]
+          html_tag?(method_name) || helper_call?(method_name)
+        when :begin
+          node.children.any? { |child| contains_html_or_helper?(child) }
+        else
+          false
+        end
+      end
+
       def process_if(node)
         condition_node, if_body, else_body = node.children
 
         # Check if this is a ternary operator (both branches are simple expressions)
         # Ternary: condition ? true_value : false_value
+        # Don't convert to ternary if branches contain HTML tags or helper calls
         is_ternary = if_body && else_body && 
                      ![:begin, :if, :while, :until, :rescue, :kwbegin].include?(if_body.type) &&
-                     ![:begin, :if, :while, :until, :rescue, :kwbegin].include?(else_body.type)
+                     ![:begin, :if, :while, :until, :rescue, :kwbegin].include?(else_body.type) &&
+                     !contains_html_or_helper?(if_body) &&
+                     !contains_html_or_helper?(else_body)
         
         if is_ternary
           # Output as ternary operator
@@ -134,8 +150,15 @@
           process_redo(node)
         when :retry
           process_retry(node)
+        when :and
+          process_and(node)
+        when :or
+          process_or(node)
         else
-          puts "Unhandled node type: #{node.type}"
+          raise ConversionError.new("Unhandled node type: #{node.type}",
+                                    node_type: node.type,
+                                    line_number: @buffer.length + 1,
+                                    context: "Processing node in #{caller_locations(1, 1).first.label}")
         end
       end
 
@@ -365,6 +388,22 @@
         end
       end
 
+      def process_and(node)
+        # For :and nodes used as statements, process both children as separate statements
+        # e.g., "foo and bar" becomes two statements: foo, then bar
+        left, right = node.children
+        process_node(left) if left
+        process_node(right) if right
+      end
+
+      def process_or(node)
+        # For :or nodes used as statements, process both children as separate statements
+        # e.g., "foo or bar" becomes two statements: foo, then bar
+        left, right = node.children
+        process_node(left) if left
+        process_node(right) if right
+      end
+
       def process_retry(node)
         condition = node.children[0]
         if condition
@@ -396,7 +435,21 @@
           else
             # Handle blocks (e.g., (1..15).collect { |n| [n, n] })
             if value_node.type == :block
-              value = extract_block_expression(value_node)
+              # Check if this is a capture block
+              block_method_call = value_node.children[0]
+              if block_method_call && block_method_call.type == :send && block_method_call.children[1] == :capture
+                # Handle capture block specially
+                var_name_str = var_name.to_s
+                add_line("<% #{var_name_str} = capture do %>", :process_assignment)
+                capture_body = value_node.children[2]
+                indent do
+                  process_node(capture_body) if capture_body
+                end
+                add_line("<% end %>", :process_assignment)
+                return
+              else
+                value = extract_block_expression(value_node)
+              end
             elsif value_node.type == :dstr
               # Preserve quotes for dstr in assignments
               value = extract_dstr(value_node)
@@ -460,6 +513,57 @@
 
       def process_method(node, statement_context: false)
         receiver, method_name, *args = node.children
+        
+        # Check if first argument is a capture block
+        first_arg_is_capture = args.first && args.first.type == :block && 
+                               args.first.children[0] && args.first.children[0].type == :send &&
+                               args.first.children[0].children[1] == :capture
+        
+        if first_arg_is_capture
+          # Handle capture block as first argument specially
+          capture_block = args.first
+          remaining_args = args[1..-1]
+          
+          # Build method call with capture block
+          receiver_str = receiver ? extract_content(receiver) : ''
+          method_call_str = if receiver_str.empty?
+                            method_name.to_s
+                          else
+                            "#{receiver_str}.#{method_name}"
+                          end
+          
+          # Output: <%= method_name capture do %>
+          add_line("<%= #{method_call_str} capture do %>", :process_method)
+          
+          # Process capture block body
+          capture_body = capture_block.children[2]
+          indent do
+            process_node(capture_body) if capture_body
+          end
+          
+          # Output remaining arguments after end
+          if remaining_args.any?
+            remaining_args_str = remaining_args.map.with_index do |arg, index|
+              if arg.type == :hash
+                hash_count = remaining_args.count { |a| a.type == :hash }
+                has_nested_hash = arg.children.any? { |pair| pair.children[1] && pair.children[1].type == :hash }
+                is_last = (index == remaining_args.length - 1)
+                # Always wrap hash arguments when they come after a capture block
+                should_wrap = true
+                extract_content_for_hash(arg, should_wrap)
+              elsif [:str, :dstr].include?(arg.type)
+                "\"#{extract_content(arg)}\""
+              else
+                extract_content(arg)
+              end
+            end.join(', ')
+            add_line("<% end, #{remaining_args_str} %>", :process_method)
+          else
+            add_line("<% end %>", :process_method)
+          end
+          return
+        end
+        
         # Count how many hash arguments we have
         hash_count = args.count { |arg| arg.type == :hash }
         arguments = args.map.with_index do |arg, index|
@@ -469,13 +573,42 @@
               pair.children[1] && pair.children[1].type == :hash
             end
             
+            # Check if hash has string values with quotes (complex strings that need braces)
+            has_quoted_strings = arg.children.any? do |pair|
+              value = pair.children[1]
+              value && value.type == :str && (value.children[0].include?("'") || value.children[0].include?('"'))
+            end
+            
+            # Check if hash has only simple values (variables or simple strings without quotes)
+            has_only_simple_values = arg.children.all? do |pair|
+              value = pair.children[1]
+              if !value
+                true
+              elsif value.type == :str
+                # Simple string (no quotes in content)
+                !value.children[0].include?("'") && !value.children[0].include?('"')
+              else
+                # Variable or other non-string value
+                true
+              end
+            end
+            
+            # Check if there are non-hash arguments before this hash
+            has_non_hash_before = args[0...index].any? { |a| a.type != :hash }
+            
+            # Special case: select_tag expects no braces even with non-hash args before
+            is_select_tag = method_name == :select_tag
+            
             # For hash arguments, don't wrap in curly braces if:
             # 1. It's the last argument
             # 2. It's the only hash argument
             # 3. It doesn't contain nested hashes
+            # 4. It doesn't have quoted strings (which need braces for clarity)
+            # 5. It has only simple values AND (there are no non-hash args before OR it's select_tag)
             # Otherwise, keep the braces for clarity
             is_last = (index == args.length - 1)
-            should_wrap = hash_count > 1 || !is_last || has_nested_hash
+            # Keep braces if there are non-hash args before, unless it's select_tag
+            should_wrap = hash_count > 1 || !is_last || has_nested_hash || has_quoted_strings || (is_last && has_non_hash_before && (!has_only_simple_values || !is_select_tag))
             extract_content_for_hash(arg, should_wrap)
           elsif [:str, :dstr].include?(arg.type)
             "\"#{extract_content(arg)}\""
@@ -748,6 +881,15 @@
         end
       end
 
+      def process_capture(method_call, body)
+        # capture used as standalone statement (e.g., content = capture { ... })
+        add_line("capture do", :process_capture)
+        indent do
+          process_node(body) if body
+        end
+        add_line("end", :process_capture)
+      end
+
       def process_block(node)
         method_call, args, body = node.children
         method_name = method_call.children[1]
@@ -776,6 +918,10 @@
         elsif method_name == :content_for
 
           process_content_for(method_call, body)
+
+        elsif method_name == :capture
+
+          process_capture(method_call, body)
 
         elsif iteration_method?(method_name)
           # Handle iteration blocks, e.g., items.each do |item|

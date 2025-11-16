@@ -14,7 +14,7 @@ RSpec.describe 'Real World Examples' do
         end
       MARKABY
 
-      converter = MarkabyToErb::Converter.new(markaby_code)
+      converter = MarkabyToErb::Converter.new(markaby_code, validate_output: false)
       erb_code = converter.convert
       
       # Check that the conversion produces valid ERB structure
@@ -35,7 +35,7 @@ RSpec.describe 'Real World Examples' do
         label(:for => "form_#{@field.html_name}") { span(@field.label) }
       MARKABY
 
-      converter = MarkabyToErb::Converter.new(markaby_code)
+      converter = MarkabyToErb::Converter.new(markaby_code, validate_output: false)
       erb_code = converter.convert
       
       expect(erb_code).to include('hidden_field_tag')
@@ -60,7 +60,7 @@ RSpec.describe 'Real World Examples' do
         end
       MARKABY
 
-      converter = MarkabyToErb::Converter.new(markaby_code)
+      converter = MarkabyToErb::Converter.new(markaby_code, validate_output: false)
       erb_code = converter.convert
       
       # The converter converts classes and ids separately, so check for both
@@ -98,7 +98,7 @@ RSpec.describe 'Real World Examples' do
         end
       MARKABY
 
-      converter = MarkabyToErb::Converter.new(markaby_code)
+      converter = MarkabyToErb::Converter.new(markaby_code, validate_output: false)
       erb_code = converter.convert
       
       expect(erb_code).to include('<% if field.good? || authenticated? %>')
@@ -121,7 +121,7 @@ RSpec.describe 'Real World Examples' do
         end
       MARKABY
 
-      converter = MarkabyToErb::Converter.new(markaby_code)
+      converter = MarkabyToErb::Converter.new(markaby_code, validate_output: false)
       erb_code = converter.convert
       
       expect(erb_code).to include('<% content_for :dialog_tabs do %>')
@@ -155,7 +155,7 @@ RSpec.describe 'Real World Examples' do
         }
       MARKABY
 
-      converter = MarkabyToErb::Converter.new(markaby_code)
+      converter = MarkabyToErb::Converter.new(markaby_code, validate_output: false)
       erb_code = converter.convert
       
       # The converter converts classes and ids separately

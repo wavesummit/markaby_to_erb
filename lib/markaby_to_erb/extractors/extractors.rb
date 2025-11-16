@@ -224,6 +224,19 @@
            extract_content_for_hash(element)
          when :str
            "\"#{extract_content(element)}\""
+         when :dstr
+           # For dstr in array context, extract without outer quotes and without escaping #
+           string_parts = element.children.map do |child|
+             case child.type
+             when :str
+               child.children[0]
+             when :begin, :evstr
+               "\#{#{extract_content(child.children.first)}}"
+             else
+               ''
+             end
+           end
+           "\"#{string_parts.join}\""
          when :send
            if element.children[1] == :t
              "t('#{extract_content(element.children[2])}')"
@@ -418,8 +431,19 @@
 
           if value.type == :dstr
             # For dynamic strings, extract properly and use ERB interpolation
-            dstr_content = extract_dstr(value)
-            value_str = "<%=\"#{dstr_content.gsub('"', '')}\"%>"
+            # Extract the dstr content without quotes, then wrap in ERB
+            dstr_parts = value.children.map do |child|
+              case child.type
+              when :str
+                child.children[0]
+              when :begin, :evstr
+                "\#{#{extract_content(child.children.first)}}"
+              else
+                ''
+              end
+            end
+            dstr_content = dstr_parts.join
+            value_str = "<%= \"#{dstr_content}\" %>"
           elsif value.type == :send || value.type == :lvar || value.type == :ivar || value.type == :cvar || value.type == :gvar
             # For method calls and variables, wrap in ERB tags
             value_str = "<%= #{extract_content(value)} %>"

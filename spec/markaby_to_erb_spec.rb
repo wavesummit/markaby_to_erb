@@ -1000,12 +1000,12 @@ RSpec.describe MarkabyToErb::Converter do
   end
 
   it 'converts markaby code' do
-    markaby_code = <<~MARKABY
-      select_tag "credit_card[expiration_month]", options_for_select([["Select Month", " "]]+(1..12).collect { |m| ["#\{"%02d" % m} - #\{Date::ABBR_MONTHNAMES[m]}", "%02d" % m] }, default_month), :style => 'margin-right: 10px;'
+    markaby_code = <<~'MARKABY'
+      select_tag "credit_card[expiration_month]", options_for_select([["Select Month", " "]]+(1..12).collect { |m| ["#{"%02d" % m} - #{Date::ABBR_MONTHNAMES[m]}", "%02d" % m] }, default_month), :style => 'margin-right: 10px;'
     MARKABY
 
-    expected_erb = <<~ERB.strip
-      <%= select_tag "credit_card[expiration_month]", options_for_select([["Select Month", " "]]+(1..12).collect { |m| ["#\{"%02d" % m} - #\{Date::ABBR_MONTHNAMES[m]}", "%02d" % m] }, default_month), :style => 'margin-right: 10px;' %>
+    expected_erb = <<~'ERB'.strip
+      <%= select_tag "credit_card[expiration_month]", options_for_select([["Select Month", " "]]+(1..12).collect { |m| ["#{"%02d" % m} - #{Date::ABBR_MONTHNAMES[m]}", "%02d" % m] }, default_month), :style => 'margin-right: 10px;' %>
     ERB
 
     expect_conversion(markaby_code, expected_erb)
@@ -1024,12 +1024,12 @@ RSpec.describe MarkabyToErb::Converter do
   end
 
   it 'converts markaby code' do
-    markaby_code = <<~MARKABY
-      link_to_remote 'Click here to manage these records.', :before => "$('loadingDiv').innerHTML=#\{image_tag('interface/lightbox/progressbar.gif', :alt => 'loading').dump\} + \' Loading ... Please Wait ...'" , :complete => "$('loadingDiv').innerHTML=''", :url => {:controller => 'dns', :action  => 'advanced_dns_block', :domain_name => params[:domain_name]}
+    markaby_code = <<~'MARKABY'
+      link_to_remote 'Click here to manage these records.', :before => "$('loadingDiv').innerHTML=#{image_tag('interface/lightbox/progressbar.gif', :alt => 'loading').dump} + ' Loading ... Please Wait ...'" , :complete => "$('loadingDiv').innerHTML=''", :url => {:controller => 'dns', :action  => 'advanced_dns_block', :domain_name => params[:domain_name]}
     MARKABY
 
-    expected_erb = <<~ERB.strip
-      <%= link_to_remote(image_tag('/images/icons/pro_payment-check.gif'), :before => "$('loadingDiv').innerHTML=#\{image_tag('interface/lightbox/progressbar.gif', :alt => 'loading').dump} + \' Loading ... Please Wait ...\'', :complete => "$('loadingDiv').innerHTML=''", :url => { :action => "#\{active_link_to}", :order_id => order.id }) %>
+    expected_erb = <<~'ERB'.strip
+      <%= link_to_remote "Click here to manage these records.", {:before => $('loadingDiv').innerHTML=#{image_tag("interface/lightbox/progressbar.gif", {:alt => 'loading'}).dump} + ' Loading ... Please Wait ...', :complete => "$('loadingDiv').innerHTML=''", :url => {:controller => 'dns', :action => 'advanced_dns_block', :domain_name => params[:domain_name]}} %>
     ERB
 
     expect_conversion(markaby_code, expected_erb)
@@ -1259,3 +1259,69 @@ end
 
 # limit_opts = (1..15).collect { |n| [n,n] }
 #      limit_opts << [t('.show_all'), 0]
+
+  describe 'capture method' do
+    it 'converts capture block used as argument' do
+      markaby_code = <<~MARKABY
+        link_to capture {
+          img :src => friend.logo
+          div.friend_name friend.nickname
+        }, friend.uri, { :rel => friend.relationship }
+      MARKABY
+
+      expected_erb = <<~ERB.strip
+        <%= link_to capture do %>
+          <img src="<%= friend.logo %>">
+          <div class="friend_name"><%= friend.nickname %></div>
+        <% end, friend.uri, {:rel => friend.relationship} %>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+
+    it 'converts capture block with conditional content' do
+      markaby_code = <<~MARKABY
+        link_to capture {
+          if friend.logo?
+            img :src => friend.logo
+          else
+            render_gravatar(friend.email)
+          end
+          div.friend_name friend.nickname
+        }, friend.uri
+      MARKABY
+
+      expected_erb = <<~ERB.strip
+        <%= link_to capture do %>
+          <% if friend.logo? %>
+            <img src="<%= friend.logo %>">
+          <% else %>
+            <%= render_gravatar friend.email %>
+          <% end %>
+          <div class="friend_name"><%= friend.nickname %></div>
+        <% end, friend.uri %>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+
+    it 'converts capture assigned to variable' do
+      markaby_code = <<~MARKABY
+        content = capture {
+          h1 "Title"
+          p "Description"
+        }
+        div.content content
+      MARKABY
+
+      expected_erb = <<~ERB.strip
+        <% content = capture do %>
+          <h1>Title</h1>
+          <p>Description</p>
+        <% end %>
+        <div class="content"><%= content %></div>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+  end

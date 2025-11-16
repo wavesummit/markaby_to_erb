@@ -31,6 +31,18 @@ OptionParser.new do |opts|
     options[:rename_old] = true
   end
 
+  opts.on('-v', '--verbose', 'Enable verbose logging') do
+    options[:verbose] = true
+  end
+
+  opts.on('--dry-run', 'Preview changes without writing files') do
+    options[:dry_run] = true
+  end
+
+  opts.on('--no-validate', 'Skip output validation') do
+    options[:no_validate] = true
+  end
+
   opts.on('-h', '--help', 'Displays Help') do
     puts opts
     exit
@@ -89,7 +101,7 @@ def rename_original_file(original_file)
 end
 
 # Method to process a single file
-def process_file(input_file, output_file, rename_old)
+def process_file(input_file, output_file, rename_old, dry_run: false, verbose: false, validate: true)
   begin
     markaby_code = File.read(input_file)
 
@@ -102,8 +114,41 @@ def process_file(input_file, output_file, rename_old)
     return
   end
 
-  converter = MarkabyToErb::Converter.new(markaby_code)
-  erb_code = converter.convert
+  begin
+    converter = MarkabyToErb::Converter.new(markaby_code, 
+                                             verbose: verbose,
+                                             validate_output: validate)
+    erb_code = converter.convert
+  rescue MarkabyToErb::ParseError => e
+    puts "Parse error in #{input_file}:"
+    puts e.message
+    return
+  rescue MarkabyToErb::ConversionError => e
+    puts "Conversion error in #{input_file}:"
+    puts e.message
+    return
+  rescue MarkabyToErb::ValidationError => e
+    puts "Validation error in #{input_file}:"
+    puts e.message
+    return
+  rescue => e
+    puts "Unexpected error processing #{input_file}:"
+    puts "#{e.class}: #{e.message}"
+    puts e.backtrace.first(5).join("\n") if ENV['DEBUG']
+    return
+  end
+
+  if dry_run
+    puts "DRY RUN: Would convert #{input_file} to #{output_file}"
+    puts "Preview (first 20 lines):"
+    puts "-" * 60
+    erb_code.lines.first(20).each_with_index do |line, idx|
+      puts "#{idx + 1}: #{line}"
+    end
+    puts "-" * 60
+    puts "... (#{erb_code.lines.count - 20} more lines)" if erb_code.lines.count > 20
+    return
+  end
 
   begin
     File.write(output_file, erb_code)
@@ -131,7 +176,10 @@ if options[:input]
                   generate_output_filename(input_file)
                 end
 
-  process_file(input_file, output_file, options[:rename_old])
+  process_file(input_file, output_file, options[:rename_old],
+               dry_run: options[:dry_run],
+               verbose: options[:verbose],
+               validate: !options[:no_validate])
 
 elsif options[:directory]
   input_dir = options[:directory]
@@ -185,6 +233,9 @@ elsif options[:directory]
       end
     end
 
-    process_file(path, output_path, options[:rename_old])
+    process_file(path, output_path, options[:rename_old],
+                 dry_run: options[:dry_run],
+                 verbose: options[:verbose],
+                 validate: !options[:no_validate])
   end
 end

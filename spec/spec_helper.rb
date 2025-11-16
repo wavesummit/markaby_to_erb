@@ -25,7 +25,7 @@ RSpec.configure do |config|
 end
 
 def expect_conversion(markaby_code, expected_erb)
-  converter = MarkabyToErb::Converter.new(markaby_code)
+  converter = MarkabyToErb::Converter.new(markaby_code, validate_output: false)
   erb_code = converter.convert
   expect(erb_code.strip).to eq(expected_erb.strip)
 end

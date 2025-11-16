@@ -1,4 +1,5 @@
 require 'markaby_to_erb/version'
+require 'markaby_to_erb/exceptions'
 require 'markaby_to_erb/converter'
 
 module MarkabyToErb
