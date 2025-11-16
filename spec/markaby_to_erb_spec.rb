@@ -658,7 +658,7 @@ RSpec.describe MarkabyToErb::Converter do
       end
     MARKABY
     expected_erb = <<~ERB.strip
-      <tr id="\<%="searchResult-#\{marked_user.id}\"%>\">
+      <tr id="<%= "searchResult-#\{marked_user.id}" %>">
         <%= render :partial => 'user_row', :locals => {:marked_user => marked_user} %>
       </tr>
     ERB
@@ -832,7 +832,7 @@ RSpec.describe MarkabyToErb::Converter do
     MARKABY
 
     expected_erb = <<~ERB.strip
-      <tr id="<%="mail_account_#\{mail_account.id}"%>">
+      <tr id="<%= "mail_account_#\{mail_account.id}" %>">
         <td>
           <% case mail_account.class_name %>
             <% when 'MailAlias' %>
@@ -1232,34 +1232,6 @@ RSpec.describe MarkabyToErb::Converter do
     expect_conversion(markaby_code, expected_erb)
   end
 
-
-end
-
-
-# TODO: the following should be tests
-# td { user.name }
-
-# form_tag( {:controller => :ssl, :action => :contacts_form}, {:id => 'contact_creation_form', :class => 'ssl-form'} )
-# <%= form_tag( {:controller => :ssl, :action => :contacts_form}, {:id => 'contact_creation_form', :class => 'ssl-form'} ) %>
-
-# <%= ftp_account.updated_at.strftime(%H:%M%P on %Y-%m-%d) %>
-# h2 "Learn how #{partner.name} can help you get online quickly."
-
-# blockquote
-
-# link_to "Facebook #{image_tag "facebook_64.png", :size => "64x64", :alt => "Facebook"}",  "/auth/facebook", :class => "auth_provider"
-# code '#feature_support h3 { background-image: url(/partners/1/support.png) }'
-
-# meta :name => 'description', :content => partner.meta_description if partner and partner.meta_description.present?
-
-#
-# <% ajax_form :url => {:action => 'add_to_list'}, :confirm_leave => :discard do %>
-
-#  if !perma_flagged_user.contacted
-
-# limit_opts = (1..15).collect { |n| [n,n] }
-#      limit_opts << [t('.show_all'), 0]
-
   describe 'capture method' do
     it 'converts capture block used as argument' do
       markaby_code = <<~MARKABY
@@ -1325,3 +1297,4 @@ end
       expect_conversion(markaby_code, expected_erb)
     end
   end
+end
