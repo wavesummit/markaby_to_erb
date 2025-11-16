@@ -255,6 +255,8 @@
           process_str(node)
         when :dstr
           process_dstr(node)
+        when :const
+          process_const(node)
         when :yield
           process_yield(node)
         when :case
@@ -291,6 +293,13 @@
 
       def process_yield(node)
         add_line("<%= yield %>", :process_yield)
+      end
+
+      def process_const(node)
+        # Handle constant references like Mab, Date::ABBR_MONTHNAMES, etc.
+        # Output as ERB expression since constants are typically used for output
+        const_str = extract_content(node)
+        add_line("<%= #{const_str} %>", :process_const)
       end
 
       def process_begin(node)

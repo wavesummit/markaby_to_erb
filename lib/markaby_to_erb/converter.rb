@@ -35,9 +35,32 @@ module MarkabyToErb
 
       pp parser if test?
       
+      # Handle empty files or files with only comments
       if parser.nil?
-        raise ParseError.new('Failed to parse the Markaby code. Parser returned nil.', 
-                            markaby_code: @markaby_code)
+        log_info("File appears to be empty or contains only comments (#{@markaby_code.lines.count} lines)")
+        
+        # Check if file is completely empty
+        if @markaby_code.strip.empty?
+          return ""
+        end
+        
+        # File contains only comments - preserve them as ERB comments
+        comment_lines = @markaby_code.lines.map do |line|
+          stripped = line.strip
+          if stripped.empty?
+            ""
+          elsif stripped.start_with?('#')
+            # Convert Ruby comment to ERB comment
+            "<%# #{stripped[1..-1].strip} %>"
+          else
+            # Preserve whitespace-only lines
+            line.chomp
+          end
+        end
+        
+        erb_code = comment_lines.join("\n").encode('UTF-8')
+        log_info("Conversion complete. Generated #{erb_code.lines.count} lines of ERB (comments only)")
+        return erb_code
       end
 
       begin

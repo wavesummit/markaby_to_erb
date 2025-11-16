@@ -1,6 +1,69 @@
 require 'spec_helper'
 
 RSpec.describe MarkabyToErb::Converter, 'real world issues' do
+    
+    it 'handles standalone constant references' do
+      markaby_code = <<~'MARKABY'
+        Mab
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <%= Mab %>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+
+    it 'handles empty files' do
+      markaby_code = ""
+
+      expected_erb = ""
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+
+    it 'handles files with only comments' do
+      markaby_code = <<~'MARKABY'
+        # nothing here yet
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <%# nothing here yet %>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+
+    it 'handles files with multiple comment lines' do
+      markaby_code = <<~'MARKABY'
+        # nothing here!
+        # placeholder for future code
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <%# nothing here! %>
+        <%# placeholder for future code %>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+
+    it 'handles files with comments and blank lines' do
+      markaby_code = <<~'MARKABY'
+        # nothing here yet
+
+        # more comments
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <%# nothing here yet %>
+
+        <%# more comments %>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+
   describe 'string interpolation in hash keys' do
     it 'quotes string interpolation in hash keys' do
       markaby_code = <<~'MARKABY'
