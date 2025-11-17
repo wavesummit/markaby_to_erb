@@ -58,10 +58,53 @@
          rstart = node.children[0].children[0]
          rend = node.children[1].children[0]
          "(#{rstart}...#{rend})"
+       elsif node.type == :const
+         # Handle constants like LINKABLE_ACCOUNT_TYPES
+         parent = node.children[0]
+         constant_name = node.children[1].to_s
+         if parent && parent.type == :const
+           # Namespaced constant like Date::ABBR_MONTHNAMES
+           parent_str = extract_receiver_chain(parent)
+           "#{parent_str}::#{constant_name}"
+         elsif parent && parent.type == :send
+           # Constant access on a method call result (e.g., account[:class_name]::SERVICE_NAME)
+           parent_str = extract_receiver_chain(parent)
+           "#{parent_str}::#{constant_name}"
+         else
+           constant_name
+         end
+       elsif node.type == :ivar || node.type == :cvar || node.type == :gvar
+         # Handle instance/class/global variables
+         node.children[0].to_s
        elsif node.type == :send
          # Recursively extract the method chain
          receiver = extract_receiver_chain(node.children[0])
          method_name = node.children[1].to_s
+         arguments = node.children[2..-1] || []
+         
+         # Handle hash/array access (method_name == :[])
+         if method_name == :[] && !arguments.empty?
+           receiver_str = receiver.empty? ? '' : extract_receiver_chain(node.children[0])
+           key_str = arguments.map do |arg|
+             if arg.type == :str
+               "'#{extract_content(arg)}'"
+             elsif arg.type == :send && arg.children[1] == :[]
+               # Handle nested hash access like account[:class_name]
+               extract_content_for_send(arg)
+             else
+               extract_content(arg)
+             end
+           end.join(", ")
+           return "#{receiver_str}[#{key_str}]"
+         end
+         
+         # If this is a method call on a hash access result, use extract_content_for_send
+         # to properly handle the hash access
+         if node.children[0] && node.children[0].is_a?(Parser::AST::Node) && 
+            node.children[0].type == :send && node.children[0].children[1] == :[]
+           return extract_content_for_send(node)
+         end
+         
          if receiver.empty?
            method_name
          else
@@ -76,12 +119,14 @@
        return '' if node.nil?
 
        case node.type
-       when :true
-         'true'
-       when :false
-         'false'
-       when :str
-         node.children[0].to_s
+      when :true
+        'true'
+      when :false
+        'false'
+      when :nil
+        'nil'
+      when :str
+        node.children[0].to_s
        when :int
          node.children[0].to_i.to_s
        when :float
@@ -94,6 +139,10 @@
         if parent && parent.type == :const
           # Recursively extract the parent namespace
           parent_str = extract_content(parent)
+          "#{parent_str}::#{constant_name}"
+        elsif parent && parent.type == :send
+          # Constant access on a method call result (e.g., account[:class_name]::SERVICE_NAME)
+          parent_str = extract_content_for_send(parent)
           "#{parent_str}::#{constant_name}"
         else
           constant_name
@@ -126,6 +175,16 @@
         extract_content_for_block(node)
       when :dstr
         extract_content_for_dstr(node)
+      when :regexp
+        # Handle regex literals like /pattern/ or /pattern/options
+        pattern_node = node.children[0]
+        options_node = node.children[1]
+        pattern = pattern_node.children[0].to_s
+        options = options_node ? options_node.children[0].to_s : ''
+        # Escape forward slashes in pattern for output
+        escaped_pattern = pattern.gsub('/', '\\/')
+        options_str = options.empty? ? '' : options
+        "/#{escaped_pattern}/#{options_str}"
       when :if
         # Handle `if` statements (including ternary operators)
         condition, if_body, else_body = node.children
@@ -135,27 +194,45 @@
                        else
                          extract_content(condition)
                        end
-        # Preserve quotes on string literals in ternary operators
-        true_str = if if_body && if_body.type == :str
-                    "'#{extract_content(if_body)}'"
-                  else
-                    extract_content(if_body)
-                  end
-        false_str = if else_body && else_body.type == :str
-                     "'#{extract_content(else_body)}'"
-                   else
-                     extract_content(else_body)
-                   end
-        # Output ternary operator - check if we're in a JavaScript string context
-        # For JavaScript strings (detected by checking if parent is a dstr in a hash), preserve space
-        # Otherwise, remove space after colon to match test expectations
-        # Heuristic: if the false_str is an empty string in quotes AND true_str is NOT a string literal, preserve space
-        # This handles: @collection ? @collection.permalink : "" (in JS strings - true_str is a variable/property)
-        # But not: 'width:286px' : '' (regular ternary - true_str is a string literal, no space)
-        is_js_string_context = (false_str == '""' || false_str == "''") && 
-                               !true_str.start_with?("'") && !true_str.start_with?('"')
-        space_after_colon = is_js_string_context ? " : " : ":"
-        "#{condition_str} ? #{true_str}#{space_after_colon}#{false_str}"
+        
+        # If else_body is nil, this is a modifier if statement, not a ternary
+        # Don't output as ternary - return the statement with modifier
+        if else_body.nil? && if_body
+          statement_str = extract_content(if_body)
+          "#{statement_str} if #{condition_str}"
+        elsif if_body && else_body
+          # This is a ternary operator (both branches exist)
+          # Preserve quotes on string literals in ternary operators
+          true_str = if if_body.type == :str
+                      "'#{extract_content(if_body)}'"
+                    else
+                      extract_content(if_body)
+                    end
+          false_str = if else_body.nil? || else_body.type == :nil
+                       'nil'
+                     elsif else_body.type == :str
+                       "'#{extract_content(else_body)}'"
+                     elsif else_body.type == :dstr
+                       # For dynamic strings in ternary false branch, wrap in double quotes
+                       dstr_content = extract_content_for_dstr(else_body)
+                       "\"#{dstr_content}\""
+                     else
+                       extract_content(else_body)
+                     end
+          # Output ternary operator - check if we're in a JavaScript string context
+          # For JavaScript strings (detected by checking if parent is a dstr in a hash), preserve space
+          # Otherwise, add space after colon for readability (Ruby style)
+          # Heuristic: if the false_str is an empty string in quotes AND true_str is NOT a string literal, preserve space
+          # This handles: @collection ? @collection.permalink : "" (in JS strings - true_str is a variable/property)
+          # But not: 'width:286px' : '' (regular ternary - true_str is a string literal, no space)
+          is_js_string_context = (false_str == '""' || false_str == "''") && 
+                                 !true_str.start_with?("'") && !true_str.start_with?('"')
+          space_after_colon = is_js_string_context ? " : " : " : "
+          "#{condition_str} ? #{true_str}#{space_after_colon}#{false_str}"
+        else
+          # Fallback - shouldn't happen in normal cases
+          extract_content(if_body || else_body)
+        end
       when :or, :and
         extract_content_for_operators(node)
       else
@@ -212,8 +289,11 @@
          # Determine the key's format
          key_str = key.type == :str ? "'#{extract_content(key)}'" : extract_content(key)
 
+         # Handle nil values
+         if value.nil? || value.type == :nil
+           hash_val = 'nil'
          # Determine if the value contains single quotes and adjust accordingly
-         if value.type == :str
+         elsif value.type == :str
            content = extract_content(value)
            # Use double quotes if content contains single quotes
            hash_val = content.include?("'") ? "\"#{content}\"" : "'#{content}'"
@@ -351,6 +431,9 @@
           # If argument is a string literal, quote it
           if arg.type == :str
             "'#{extract_content(arg)}'"
+          elsif arg.type == :send && arg.children[1] == :[]
+            # Handle nested hash access like account[:class_name]
+            extract_content_for_send(arg)
           else
             extract_content(arg)
           end
@@ -563,6 +646,40 @@
             end
             dstr_content = dstr_parts.join
             value_str = "<%= \"#{dstr_content}\" %>"
+          elsif value.type == :if || (value.type == :begin && value.children[0] && value.children[0].type == :if)
+            # Handle ternary operators in attributes
+            # May be wrapped in :begin due to parentheses
+            if_node = value.type == :if ? value : value.children[0]
+            condition, if_body, else_body = if_node.children
+            condition_str = if condition && condition.type == :begin
+                             extract_content(condition.children[0])
+                           else
+                             extract_content(condition)
+                           end
+            true_str = if if_body && if_body.type == :str
+                       "'#{extract_content(if_body)}'"
+                     else
+                       extract_content(if_body)
+                     end
+            false_str = if else_body && else_body.type == :str
+                        "'#{extract_content(else_body)}'"
+                      elsif else_body && else_body.type == :dstr
+                        # Handle dstr in false branch (e.g., "#{var}_dialog")
+                        dstr_parts = else_body.children.map do |child|
+                          case child.type
+                          when :str
+                            child.children[0]
+                          when :begin, :evstr
+                            "\#{#{extract_content(child.children.first)}}"
+                          else
+                            ''
+                          end
+                        end
+                        "\"#{dstr_parts.join}\""
+                      else
+                        extract_content(else_body)
+                      end
+            value_str = "<%= #{condition_str} ? #{true_str} : #{false_str} %>"
           elsif value.type == :send || value.type == :lvar || value.type == :ivar || value.type == :cvar || value.type == :gvar
             # For method calls and variables, wrap in ERB tags
             value_str = "<%= #{extract_content(value)} %>"

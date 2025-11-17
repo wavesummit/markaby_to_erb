@@ -77,12 +77,11 @@ def generate_output_filename(input_file)
   File.join(input_dir, output_filename)
 end
 
-# Method to rename the original file by appending _old before the extension
+# Method to rename the original file by appending .old to the extension
 def rename_original_file(original_file)
   dir = File.dirname(original_file)
-  basename = File.basename(original_file, File.extname(original_file))
-  ext = File.extname(original_file)
-  new_name = "#{basename}_old#{ext}.rb"
+  basename = File.basename(original_file)
+  new_name = "#{basename}.old"
   new_path = File.join(dir, new_name)
 
   if File.exist?(new_path)
@@ -104,11 +103,6 @@ end
 def process_file(input_file, output_file, rename_old, dry_run: false, verbose: false, validate: true)
   begin
     markaby_code = File.read(input_file)
-
-    if markaby_code.empty?
-      puts "File empty"
-      return
-    end
   rescue Errno::ENOENT
     puts "Input file not found: #{input_file}"
     return
@@ -119,6 +113,10 @@ def process_file(input_file, output_file, rename_old, dry_run: false, verbose: f
                                              verbose: verbose,
                                              validate_output: validate)
     erb_code = converter.convert
+    
+    if markaby_code.empty?
+      puts "File empty"
+    end
   rescue MarkabyToErb::ParseError => e
     puts "Parse error in #{input_file}:"
     puts e.message

@@ -672,7 +672,7 @@ RSpec.describe MarkabyToErb::Converter do
       end
     MARKABY
     expected_erb = <<~ERB.strip
-      <%= pagination_links_each(user_pages, {:window_size => 5}) do %>
+      <% pagination_links_each user_pages, :window_size => 5 do %>
         <%= link_to_remote number.to_s, {:url => {:action => 'perma_flagged_users', :page => number}} %>
       <% end %>
     ERB
@@ -1016,9 +1016,9 @@ RSpec.describe MarkabyToErb::Converter do
       inputStyle = (params['lightbox']=='true') ? 'width:286px':''
     MARKABY
 
-    expected_erb = <<~ERB.strip
-      <% inputStyle = params['lightbox'] == 'true' ? 'width:286px':'' %>
-    ERB
+      expected_erb = <<~ERB.strip
+        <% inputStyle = params['lightbox'] == 'true' ? 'width:286px' : '' %>
+      ERB
 
     expect_conversion(markaby_code, expected_erb)
   end
@@ -1124,7 +1124,7 @@ RSpec.describe MarkabyToErb::Converter do
     MARKABY
 
     expected_erb = <<~ERB.strip
-      <%= form_tag({:controller => :ssl, :action => :contacts_form}, {:id => 'contact_creation_form', :class => 'ssl-form'}) %>
+      <%= form_tag {:controller => :ssl, :action => :contacts_form}, {:id => 'contact_creation_form', :class => 'ssl-form'} %>
     ERB
 
     expect_conversion(markaby_code, expected_erb)
@@ -1211,7 +1211,7 @@ RSpec.describe MarkabyToErb::Converter do
     MARKABY
 
     expected_erb = <<~ERB.strip
-      <%= ajax_form({:url => {:action => 'add_to_list'}, :confirm_leave => :discard}) do %>
+      <% ajax_form :url => {:action => 'add_to_list'}, :confirm_leave => :discard do %>
       <% end %>
     ERB
 

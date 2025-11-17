@@ -18,6 +18,16 @@
             has_empty_parens || receiver_is_html
         when :begin
           node.children.any? { |child| contains_html_or_helper?(child) }
+        when :block
+          # Check if block contains HTML tags or helper calls
+          method_call, args, body = node.children
+          method_name = method_call.children[1] if method_call && method_call.type == :send
+          # Check if the method call itself is an HTML tag or helper
+          if method_name && (html_tag?(method_name) || helper_call?(method_name))
+            return true
+          end
+          # Check the block body for HTML tags or helpers
+          contains_html_or_helper?(body)
         else
           false
         end
@@ -111,29 +121,48 @@
         end
 
         # Check if else_body is an :if node (indicating an elsif)
+        # But first check if it's actually an unless block (if_body is nil)
         if else_body&.type == :if
-          # Handle if-elsif chain
-          add_line("<% if #{extract_content(condition_node)} %>", :process_if)
-          indent do
-            process_node(if_body) if if_body
-          end
-
-          # Process all elsif conditions
-          current_node = else_body
-          while current_node&.type == :if
-            condition, body, next_else = current_node.children
-            add_line("<% elsif #{extract_content(condition)} %>", :process_if)
+          # Check if this is actually an unless block (if_body is nil, else_body is non-nil)
+          # In that case, we should process it as a nested unless, not as an elsif chain
+          nested_condition, nested_if_body, nested_else_body = else_body.children
+          if nested_if_body.nil? && nested_else_body
+            # This is a nested unless block - process it as unless, not elsif
+            # The outer unless wraps the inner unless
+            add_line("<% unless #{extract_content(condition_node)} %>", :process_if)
             indent do
-              process_node(body) if body
+              add_line("<% unless #{extract_content(nested_condition)} %>", :process_if)
+              indent do
+                process_node(nested_else_body)
+              end
+              add_line('<% end %>', :process_if)
             end
-            current_node = next_else
-          end
-
-          # Handle final else if it exists
-          if current_node
-            add_line('<% else %>', :process_if)
+            add_line('<% end %>', :process_if)
+            return
+          else
+            # Handle if-elsif chain
+            add_line("<% if #{extract_content(condition_node)} %>", :process_if)
             indent do
-              process_node(current_node)
+              process_node(if_body) if if_body
+            end
+
+            # Process all elsif conditions
+            current_node = else_body
+            while current_node&.type == :if
+              condition, body, next_else = current_node.children
+              add_line("<% elsif #{extract_content(condition)} %>", :process_if)
+              indent do
+                process_node(body) if body
+              end
+              current_node = next_else
+            end
+
+            # Handle final else if it exists
+            if current_node
+              add_line('<% else %>', :process_if)
+              indent do
+                process_node(current_node)
+              end
             end
           end
         elsif if_body.nil? && else_body
@@ -944,15 +973,12 @@
                          end
 
         # Build the method call
-        # Only add parentheses if there are multiple hash arguments (for clarity)
-        # or if the arguments contain complex structures
+        # Don't use parentheses for hash arguments - match existing ERB style
+        # Existing ERB files show: ajax_form :url => {...}, :confirm_leave => :save do
         if arguments.empty?
           result = method_call_str
-        elsif hash_count > 1
-          # Multiple hash arguments - use parentheses for clarity
-          result = "#{method_call_str}(#{arguments})"
         else
-          # Single argument or simple arguments - no parentheses (Ruby style)
+          # No parentheses - Ruby style, matches existing ERB files
           result = "#{method_call_str} #{arguments}"
         end
         # If it's a statement context and has no arguments, use <% instead of <%=
@@ -1046,7 +1072,7 @@
 
           content = args.reject { |arg| arg.type == :hash }.map do |arg|
             case arg.type
-            when :lvar, :send
+            when :lvar, :send, :ivar, :cvar, :gvar
               "<%= #{extract_content(arg)} %>"
             when :dstr
               # Handle dynamic strings with interpolation
@@ -1223,24 +1249,46 @@
           end
           add_line("  <%= raw #{formatted_array}.join %>", :process_content_for)
           add_line("<% end %>", :process_content_for)
-        # Use inline form for simple content (strings, method calls, variables) or simple blocks
-        elsif body.is_a?(Parser::AST::Node) && contains_complex_structure?(body) == false
-
-          content = if body.type == :str
-                      "\"#{extract_content(body)}\""
-                    else
-                      extract_content(body)
-                    end
-
-          add_line("<% content_for #{content_key}, #{content} %>", :process_content_for)
         else
-          # Use block form for complex content
-          add_line("<% content_for #{content_key} do %>", :process_content_for)
-          indent do
-            process_node(body) if body
+          # Always use block form for content_for when it was originally a block
+          # This preserves the semantic meaning and ensures proper evaluation
+          if body
+            # For string literals, use inline form for compactness
+            if body.type == :str
+              str_content = extract_content(body)
+              add_line("<% content_for #{content_key}, #{str_content.inspect} %>", :process_content_for)
+            # For simple method calls (like t(...)), use inline form for compactness
+            elsif body.type == :send && is_simple_method_call?(body)
+              method_content = extract_content(body)
+              add_line("<% content_for #{content_key}, #{method_content} %>", :process_content_for)
+            else
+              # For other content, use block form
+              add_line("<% content_for #{content_key} do %>", :process_content_for)
+              indent do
+                process_node(body)
+              end
+              add_line("<% end %>", :process_content_for)
+            end
+          else
+            add_line("<% content_for #{content_key} do %>", :process_content_for)
+            add_line("<% end %>", :process_content_for)
           end
-          add_line("<% end %>", :process_content_for)
         end
+      end
+
+      def is_simple_method_call?(node)
+        return false unless node.type == :send
+        receiver, method_name, *args = node.children
+        # Simple if: no receiver, single method call, and argument is a simple string or symbol
+        return false if receiver # Has a receiver (like obj.method)
+        return false if args.length != 1 # Must have exactly one argument
+        return false if args.empty? # No arguments (might be a variable)
+        
+        # Only allow simple string or symbol arguments (like t('.key') or t(:key))
+        # Don't allow hashes or complex arguments - those should use block form
+        arg = args.first
+        return true if [:str, :sym].include?(arg.type)
+        return false
       end
 
       def process_capture(method_call, body)
@@ -1295,7 +1343,13 @@
 
         elsif iteration_method?(method_name)
           # Handle iteration blocks, e.g., items.each do |item|
-          receiver_chain = extract_receiver_chain(method_call.children[0])
+          receiver_node = method_call.children[0]
+          # If receiver is a hash/array access (send node with []), use extract_content_for_send
+          if receiver_node && receiver_node.type == :send && receiver_node.children[1] == :[]
+            receiver_chain = extract_content_for_send(receiver_node)
+          else
+            receiver_chain = extract_receiver_chain(receiver_node)
+          end
           receiver_args = extract_argument_recursive(args).join(',')
 
           add_line("<% #{receiver_chain}.#{method_name} do |#{receiver_args}| %>", :process_block)
@@ -1324,8 +1378,36 @@
           add_line("</#{html_tag}>", :process_block)
 
         else
-          # Combine method call with `do` in one line
-          erb_code = "<%= #{extract_content(method_call)} do %>"
+          # For helper methods or other method calls with blocks, use <% not <%=
+          # The block itself doesn't output - the content inside does
+          # Extract method call without parentheses to match existing ERB style
+          receiver, method_name_node, *args = method_call.children
+          receiver_str = receiver ? extract_content(receiver) : ''
+          method_name_str = method_name_node.to_s
+          
+          # Extract arguments without parentheses (match existing ERB style)
+          arguments_str = args.map do |arg|
+            if arg.type == :hash
+              # Don't wrap hash arguments in braces when in blocks
+              extract_content_for_hash(arg, false)
+            else
+              extract_content(arg)
+            end
+          end.join(', ')
+          
+          method_call_str = if receiver_str.empty?
+                            method_name_str
+                          else
+                            "#{receiver_str}.#{method_name_str}"
+                          end
+          
+          if arguments_str.empty?
+            erb_code = "<% #{method_call_str} do %>"
+          else
+            # No parentheses - matches existing ERB files like: ajax_form :url => {...}, :confirm_leave => :save do
+            erb_code = "<% #{method_call_str} #{arguments_str} do %>"
+          end
+          
           add_line(erb_code, :process_block)
 
           indent do

@@ -5,7 +5,7 @@ module MarkabyToErb
          table tr td th form input label select option
          textarea button meta br hr img link tbody thead
          hgroup i iframe object pre video tfoot dt em fieldset strong
-         blockquote code].include?(method_name.to_s)
+         blockquote code b u s small sup sub].include?(method_name.to_s)
     end
 
     def iteration_method?(method_name)
@@ -25,7 +25,8 @@ module MarkabyToErb
                    text_field_tag password_field_tag select_tag check_box_tag radio_button_tag file_field_tag
                    link_to link_to_remote button_to
                    url_for image_tag stylesheet_link_tag javascript_include_tag date_select time_select
-                   distance_of_time_in_words truncate highlight simple_format sanitize content_tag flash number_to_human_size]
+                   distance_of_time_in_words truncate highlight simple_format sanitize content_tag flash number_to_human_size
+                   ajax_form dialog_button cycle]
 
       helpers.include?(method_name.to_s)
     end

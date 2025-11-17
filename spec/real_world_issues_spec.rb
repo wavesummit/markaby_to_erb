@@ -64,6 +64,56 @@ RSpec.describe MarkabyToErb::Converter, 'real world issues' do
       expect_conversion(markaby_code, expected_erb)
     end
 
+    it 'handles ternary operators in class attributes' do
+      markaby_code = <<~'MARKABY'
+        div(:class => (@content_for_dialog_size.nil? ? 'medium_dialog' : "#{@content_for_dialog_size}_dialog")) do
+        end
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <div class="<%= @content_for_dialog_size.nil? ? 'medium_dialog' : "#{@content_for_dialog_size}_dialog" %>">
+        </div>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+
+    it 'handles instance variables as tag content' do
+      markaby_code = <<~'MARKABY'
+        h1 @content_for_dialog_heading
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <h1><%= @content_for_dialog_heading %></h1>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+
+    it 'handles nested unless statements' do
+      markaby_code = <<~'MARKABY'
+        unless params[:controller] == 'resource/help'
+          li do
+            link_to t('.help'), "#{wiki_url(help_path)}"
+          end unless @content_for_help_path == 'none'
+        end unless @content_for_dialog_header_tools
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <% unless @content_for_dialog_header_tools %>
+          <% unless params[:controller] == 'resource/help' %>
+            <% unless @content_for_help_path == 'none' %>
+              <li>
+                <%= link_to t('.help'), "#{wiki_url(help_path)}" %>
+              </li>
+            <% end %>
+          <% end %>
+        <% end %>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+
   describe 'string interpolation in hash keys' do
     it 'quotes string interpolation in hash keys' do
       markaby_code = <<~'MARKABY'
@@ -102,7 +152,7 @@ RSpec.describe MarkabyToErb::Converter, 'real world issues' do
 
       expected_erb = <<~'ERB'.strip
         <%= javascript_tag %{
-          var url = '/resource/asset/image/manage' + '<%= @collection ? "/collection/" + @collection.permalink : "" %>';
+          var url = '/resource/asset/image/manage' + '<%= @collection ? "/collection/" + @collection.permalink  : "" %>';
         } %>
       ERB
       expect_conversion(markaby_code, expected_erb)
