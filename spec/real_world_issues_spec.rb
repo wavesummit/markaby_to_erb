@@ -356,5 +356,27 @@ RSpec.describe MarkabyToErb::Converter, 'real world issues' do
       expect_conversion(markaby_code, expected_erb, default_to_instance_variables: true)
     end
   end
+
+  describe 'HTML string interpolation in conditionals' do
+    it 'converts HTML strings with interpolation in if/else blocks' do
+      markaby_code = <<~'MARKABY'
+        if collection.assets.size == 0
+          '--'
+        else
+          "<b>#{collection.assets.size}</b>"
+        end
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <% if collection.assets.size == 0 %>
+          --
+        <% else %>
+          <b><%= collection.assets.size %></b>
+        <% end %>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+  end
 end
 

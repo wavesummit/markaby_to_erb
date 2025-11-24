@@ -51,11 +51,14 @@
         # Check if this is a ternary operator (both branches are simple expressions)
         # Ternary: condition ? true_value : false_value
         # Don't convert to ternary if branches contain HTML tags or helper calls
+        # Also don't convert if dstr nodes contain HTML (should be converted to ERB format)
         is_ternary = if_body && else_body && 
                      ![:begin, :if, :while, :until, :rescue, :kwbegin].include?(if_body.type) &&
                      ![:begin, :if, :while, :until, :rescue, :kwbegin].include?(else_body.type) &&
                      !contains_html_or_helper?(if_body) &&
-                     !contains_html_or_helper?(else_body)
+                     !contains_html_or_helper?(else_body) &&
+                     !dstr_contains_html?(if_body) &&
+                     !dstr_contains_html?(else_body)
         
         if is_ternary
           # Output as ternary operator
@@ -67,11 +70,19 @@
                          end
           true_str = if if_body.type == :str
                       "'#{extract_content(if_body)}'"
+                    elsif if_body.type == :dstr
+                      # For dynamic strings, wrap in double quotes
+                      dstr_content = extract_content_for_dstr(if_body)
+                      "\"#{dstr_content}\""
                     else
                       extract_content(if_body)
                     end
           false_str = if else_body.type == :str
                        "'#{extract_content(else_body)}'"
+                     elsif else_body.type == :dstr
+                       # For dynamic strings, wrap in double quotes
+                       dstr_content = extract_content_for_dstr(else_body)
+                       "\"#{dstr_content}\""
                      else
                        extract_content(else_body)
                      end
@@ -586,6 +597,19 @@
         dstr_node.children.any? { |child| [:begin, :evstr].include?(child.type) }
       end
 
+      def dstr_contains_html?(dstr_node)
+        return false unless dstr_node && dstr_node.type == :dstr
+        # Check if any string parts contain HTML tags
+        dstr_node.children.any? do |child|
+          if child.type == :str
+            # Check if string contains HTML tags (simple pattern: < followed by word characters)
+            child.children[0] =~ /<[a-zA-Z]/
+          else
+            false
+          end
+        end
+      end
+
       def process_method_with_heredoc_interpolation(node, dstr_node, arg_index)
         # Process method call with heredoc string argument containing interpolation
         # Convert #{...} interpolations to ERB tags while preserving the heredoc structure
@@ -749,8 +773,25 @@
       end
 
       def process_dstr(node)
-        value = extract_dstr(node)
-        add_line("<%= #{value} %>", :process_str)
+        # If the dstr contains HTML tags, convert interpolations to ERB format
+        if dstr_contains_html?(node)
+          # Convert HTML string with interpolation to ERB format
+          html_parts = []
+          node.children.each do |child|
+            case child.type
+            when :str
+              html_parts << child.children[0]
+            when :begin, :evstr
+              interpolation_code = extract_content(child.children.first)
+              html_parts << "<%= #{interpolation_code} %>"
+            end
+          end
+          add_line(html_parts.join, :process_dstr)
+        else
+          # Regular dynamic string - use string interpolation syntax
+          value = extract_dstr(node)
+          add_line("<%= #{value} %>", :process_str)
+        end
       end
 
       def process_assignment(node)
