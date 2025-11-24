@@ -40,6 +40,22 @@ module MarkabyToErb
       end
     end
 
+    def default_instance_variable_name(name)
+      return name unless defined?(@default_to_instance_variables) && @default_to_instance_variables
+
+      name_str = name.to_s
+      return name_str if name_str.start_with?('@')
+      return name_str unless name_str.match?(/\A[a-z_]\w*\z/)
+      return name_str if path_helper_name?(name_str)
+      return name_str if helper_call?(name_str)
+
+      "@#{name_str}"
+    end
+
+    def path_helper_name?(name)
+      name.end_with?('_path') || name.end_with?('_url')
+    end
+
 
 
   end

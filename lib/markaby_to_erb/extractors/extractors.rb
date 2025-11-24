@@ -379,7 +379,8 @@
      end
 
      def extract_content_for_send(node)
-       receiver, method_name, *arguments = node.children
+      receiver, method_name, *arguments = node.children
+      method_name_str = method_name.to_s
 
        # Special handling for << operator (shovel operator)
        if method_name == :<< && receiver
@@ -557,19 +558,19 @@
       # For helper methods like image_tag, don't use parentheses for single string argument
       if receiver_str.empty?
         if arguments_str.empty?
-          method_name.to_s
+          default_instance_variable_name(method_name_str)
         elsif method_name == :image_tag && arguments.length == 1 && arguments[0].type == :str
           # image_tag with single string argument - no parentheses
           # Use double quotes for image_tag arguments to match test expectations
           str_arg = arguments[0]
           str_content = str_arg.children[0]  # Get the string content directly
           quoted_arg = "\"#{str_content}\""
-          "#{method_name.to_s} #{quoted_arg}"
+          "#{method_name_str} #{quoted_arg}"
         else
-          "#{method_name.to_s}(#{arguments_str})"
+          "#{method_name_str}(#{arguments_str})"
         end
       else
-        receiver_str + '.' + method_name.to_s + (arguments_str.empty? ? '' : "(#{arguments_str})")
+        receiver_str + '.' + method_name_str + (arguments_str.empty? ? '' : "(#{arguments_str})")
       end
      end
 

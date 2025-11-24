@@ -19,6 +19,7 @@ module MarkabyToErb
       @line_numbers = {} # Track line numbers for error reporting
       @current_line = 1
       @validate_output = options.fetch(:validate_output, true)
+      @default_to_instance_variables = options.fetch(:default_to_instance_variables, false)
       @verbose = options.fetch(:verbose, false)
       @logger = options.fetch(:logger, nil)
       @logger ||= Logger.new($stdout) if @verbose

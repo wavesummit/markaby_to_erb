@@ -966,18 +966,19 @@
 
         # Build the method call with receiver if present
         receiver_str = receiver ? extract_content(receiver) : ''
-        method_call_str = if receiver_str.empty?
-                           method_name.to_s
-                         else
-                           "#{receiver_str}.#{method_name}"
-                         end
+        method_name_str = method_name.to_s
 
         # Build the method call
         # Don't use parentheses for hash arguments - match existing ERB style
         # Existing ERB files show: ajax_form :url => {...}, :confirm_leave => :save do
         if arguments.empty?
-          result = method_call_str
+          result = if receiver_str.empty?
+                     default_instance_variable_name(method_name_str)
+                   else
+                     "#{receiver_str}.#{method_name_str}"
+                   end
         else
+          method_call_str = receiver_str.empty? ? method_name_str : "#{receiver_str}.#{method_name_str}"
           # No parentheses - Ruby style, matches existing ERB files
           result = "#{method_call_str} #{arguments}"
         end
@@ -1223,7 +1224,7 @@
           process_method(node, statement_context: true)
         else
           # Handle variable references
-          add_line("<%= #{method_name} %>", :process_send)
+          add_line("<%= #{default_instance_variable_name(method_name.to_s)} %>", :process_send)
         end
       end
 

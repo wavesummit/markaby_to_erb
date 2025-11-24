@@ -330,5 +330,31 @@ RSpec.describe MarkabyToErb::Converter, 'real world issues' do
       expect_conversion(markaby_code, expected_erb)
     end
   end
+
+  describe 'default instance variable output option' do
+    it 'prefixes bare identifiers with @ when enabled' do
+      markaby_code = <<~'MARKABY'
+        h1 dialog_heading
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <h1><%= @dialog_heading %></h1>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb, default_to_instance_variables: true)
+    end
+
+    it 'leaves path helper style methods unchanged' do
+      markaby_code = <<~'MARKABY'
+        p account_path
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <p><%= account_path %></p>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb, default_to_instance_variables: true)
+    end
+  end
 end
 
