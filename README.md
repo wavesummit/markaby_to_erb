@@ -93,6 +93,19 @@ puts erb_code
 # </html>
 ```
 
+#### Default to Instance Variables
+
+You can opt-in to treating bare identifiers in tag content as instance variables—handy when older Markaby views assume everything is an `@var`.
+
+```ruby
+converter = MarkabyToErb::Converter.new(
+  markaby_code,
+  default_to_instance_variables: true
+)
+```
+
+When enabled, identifiers such as `dialog_heading` become `@dialog_heading`, while helper calls or `_path`/`_url` methods are left untouched.
+
 ### Command-Line Interface
 
 #### Convert a single file
