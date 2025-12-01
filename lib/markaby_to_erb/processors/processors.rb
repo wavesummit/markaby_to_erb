@@ -52,9 +52,11 @@
         # Ternary: condition ? true_value : false_value
         # Don't convert to ternary if branches contain HTML tags or helper calls
         # Also don't convert if dstr nodes contain HTML (should be converted to ERB format)
+        # Don't convert assignments to ternary (they should be full if/else blocks)
+        excluded_types = [:begin, :if, :while, :until, :rescue, :kwbegin, :lvasgn, :ivasgn, :cvasgn, :gvasgn, :op_asgn]
         is_ternary = if_body && else_body && 
-                     ![:begin, :if, :while, :until, :rescue, :kwbegin].include?(if_body.type) &&
-                     ![:begin, :if, :while, :until, :rescue, :kwbegin].include?(else_body.type) &&
+                     !excluded_types.include?(if_body.type) &&
+                     !excluded_types.include?(else_body.type) &&
                      !contains_html_or_helper?(if_body) &&
                      !contains_html_or_helper?(else_body) &&
                      !dstr_contains_html?(if_body) &&

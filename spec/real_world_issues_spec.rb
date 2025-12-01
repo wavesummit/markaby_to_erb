@@ -378,5 +378,308 @@ RSpec.describe MarkabyToErb::Converter, 'real world issues' do
       expect_conversion(markaby_code, expected_erb)
     end
   end
+
+  # ==========================================================================
+  # Tests for issues found during Hydra project conversion (392 files)
+  # ==========================================================================
+
+  describe 'elsif inside tag blocks' do
+    it 'converts if/elsif/end inside a td block' do
+      markaby_code = <<~'MARKABY'
+        td :align => 'center' do
+          if @notification.state == 'informational'
+            link_to icon('information'), { :controller => 'notifications', :action => 'index' }
+          elsif @notification.state == 'warning'
+            link_to icon('alert'), { :controller => 'notifications', :action => 'index' }
+          end
+        end
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <td align="center">
+          <% if @notification.state == 'informational' %>
+            <%= link_to icon('information'), {:controller => 'notifications', :action => 'index'} %>
+          <% elsif @notification.state == 'warning' %>
+            <%= link_to icon('alert'), {:controller => 'notifications', :action => 'index'} %>
+          <% end %>
+        </td>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+
+    it 'converts if/elsif/else/end inside a div block' do
+      markaby_code = <<~'MARKABY'
+        div.status do
+          if user.active?
+            span.green "Active"
+          elsif user.pending?
+            span.yellow "Pending"
+          else
+            span.red "Inactive"
+          end
+        end
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <div class="status">
+          <% if user.active? %>
+            <span class="green">Active</span>
+          <% elsif user.pending? %>
+            <span class="yellow">Pending</span>
+          <% else %>
+            <span class="red">Inactive</span>
+          <% end %>
+        </div>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+  end
+
+  describe 'ternary expressions with complex hash parameters' do
+    it 'converts conditional hash assignment with full if/else blocks' do
+      # When both branches are assignments, they should be full if/else blocks
+      markaby_code = <<~'MARKABY'
+        if selected
+          inputProps = {:class => 'checkbox', :checked => 'checked'}
+        else
+          inputProps = {:class => 'checkbox'}
+        end
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <% if selected %>
+          <% inputProps = {:class => 'checkbox', :checked => 'checked'} %>
+        <% else %>
+          <% inputProps = {:class => 'checkbox'} %>
+        <% end %>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+  end
+
+  describe 'comparison operators in tag blocks' do
+    it 'converts greater than comparison in conditionals' do
+      markaby_code = <<~'MARKABY'
+        if items.count > 0
+          ul do
+            items.each do |item|
+              li item.name
+            end
+          end
+        end
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <% if items.count > 0 %>
+          <ul>
+            <% items.each do |item| %>
+              <li><%= item.name %></li>
+            <% end %>
+          </ul>
+        <% end %>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+
+    it 'converts less than comparison in conditionals' do
+      markaby_code = <<~'MARKABY'
+        if page < total_pages
+          link_to "Next", next_page_path
+        end
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <% if page < total_pages %>
+          <%= link_to "Next", next_page_path %>
+        <% end %>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+
+    it 'converts greater than or equal comparison' do
+      markaby_code = <<~'MARKABY'
+        span.badge count if count >= 1
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <% if count >= 1 %>
+          <span class="badge"><%= count %></span>
+        <% end %>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+  end
+
+  describe 'UTF-8 encoded content' do
+    it 'handles UTF-8 special characters in strings' do
+      markaby_code = <<~'MARKABY'
+        p "Copyright © 2024"
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <p>Copyright © 2024</p>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+
+    it 'handles UTF-8 in tag content' do
+      markaby_code = <<~'MARKABY'
+        span "Ñoño"
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <span>Ñoño</span>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+  end
+
+  describe 'end_form helper pattern' do
+    it 'already handles end_form as closing form tag' do
+      # Note: end_form is already handled in the converter
+      markaby_code = <<~'MARKABY'
+        end_form
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        </form>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+  end
+
+  describe 'complex nested conditionals in blocks' do
+    it 'converts multiple elsif branches with helper calls' do
+      markaby_code = <<~'MARKABY'
+        td do
+          if status == 'active'
+            image_tag "icons/green.png"
+          elsif status == 'pending'
+            image_tag "icons/yellow.png"
+          elsif status == 'suspended'
+            image_tag "icons/orange.png"
+          else
+            image_tag "icons/red.png"
+          end
+        end
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <td>
+          <% if status == 'active' %>
+            <%= image_tag "icons/green.png" %>
+          <% elsif status == 'pending' %>
+            <%= image_tag "icons/yellow.png" %>
+          <% elsif status == 'suspended' %>
+            <%= image_tag "icons/orange.png" %>
+          <% else %>
+            <%= image_tag "icons/red.png" %>
+          <% end %>
+        </td>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+  end
+
+  describe 'tag with class and hash attributes' do
+    it 'converts tag.class with hash attributes' do
+      markaby_code = <<~'MARKABY'
+        td.price(:style => 'text-align: right') { order.total }
+      MARKABY
+
+      # Note: attribute order may vary (style before class is acceptable)
+      expected_erb = <<~'ERB'.strip
+        <td style="text-align: right" class="price">
+          <%= order.total %>
+        </td>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+
+    it 'converts tag.class.another_class with hash attributes' do
+      markaby_code = <<~'MARKABY'
+        div.container.fluid(:id => 'main') do
+          p "Content"
+        end
+      MARKABY
+
+      # Note: attribute order may vary (id before class is acceptable)
+      expected_erb = <<~'ERB'.strip
+        <div id="main" class="container fluid">
+          <p>Content</p>
+        </div>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+  end
+
+  describe 'form helpers with multiple hash arguments' do
+    it 'converts form_tag with url hash and options hash' do
+      markaby_code = <<~'MARKABY'
+        form_tag({:controller => 'users', :action => 'create'}, {:id => 'user_form', :class => 'form'}) do
+          text_field_tag :name
+          submit_tag "Save"
+        end
+      MARKABY
+
+      # Note: hash arguments are flattened without braces in block context
+      expected_erb = <<~'ERB'.strip
+        <% form_tag :controller => 'users', :action => 'create', :id => 'user_form', :class => 'form' do %>
+          <%= text_field_tag :name %>
+          <%= submit_tag "Save" %>
+        <% end %>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+  end
+
+  describe 'nested iteration with conditionals' do
+    it 'converts each loop with if/elsif inside' do
+      markaby_code = <<~'MARKABY'
+        @items.each do |item|
+          tr do
+            td item.name
+            td do
+              if item.status == 'active'
+                span.green "Active"
+              elsif item.status == 'inactive'
+                span.red "Inactive"
+              end
+            end
+          end
+        end
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <% @items.each do |item| %>
+          <tr>
+            <td><%= item.name %></td>
+            <td>
+              <% if item.status == 'active' %>
+                <span class="green">Active</span>
+              <% elsif item.status == 'inactive' %>
+                <span class="red">Inactive</span>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+  end
 end
 
