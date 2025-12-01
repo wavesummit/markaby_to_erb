@@ -325,6 +325,8 @@
           process_lvar(node)
         when :ivar
           process_ivar(node)
+        when :def
+          process_def(node)
         else
           raise ConversionError.new("Unhandled node type: #{node.type}",
                                     node_type: node.type,
@@ -592,6 +594,20 @@
         # Instance variable reference - output with ERB tags when in output context
         var_name = node.children[0]
         add_line("<%= #{var_name} %>", :process_ivar)
+      end
+
+      def process_def(node)
+        # Method definitions in view templates are not supported
+        # Raise a clear error message suggesting the user extract the method to a helper
+        method_name = node.children[0]
+        raise ConversionError.new(
+          "Method definition '#{method_name}' found in view template. " \
+          "View templates should not contain method definitions. " \
+          "Please extract this method to a helper module instead.",
+          node_type: :def,
+          line_number: @buffer.length + 1,
+          context: "Method definition: def #{method_name}"
+        )
       end
 
       def has_interpolation?(dstr_node)
@@ -958,11 +974,6 @@
         hash_count = args.count { |arg| arg.type == :hash }
         arguments = args.map.with_index do |arg, index|
           if arg.type == :hash
-            # Check if hash contains nested hashes (complex structure)
-            has_nested_hash = arg.children.any? do |pair|
-              pair.children[1] && pair.children[1].type == :hash
-            end
-            
             # Check if hash has string values with quotes (complex strings that need braces)
             has_quoted_strings = arg.children.any? do |pair|
               value = pair.children[1]
@@ -978,7 +989,7 @@
                 # Simple string (no quotes in content)
                 !value.children[0].include?("'") && !value.children[0].include?('"')
               else
-                # Variable or other non-string value
+                # Variable or other non-string value (including nested hashes which are fine)
                 true
               end
             end
@@ -989,16 +1000,18 @@
             # Special case: select_tag expects no braces even with non-hash args before
             is_select_tag = method_name == :select_tag
             
-            # For hash arguments, don't wrap in curly braces if:
-            # 1. It's the last argument
-            # 2. It's the only hash argument
-            # 3. It doesn't contain nested hashes
-            # 4. It doesn't have quoted strings (which need braces for clarity)
-            # 5. It has only simple values AND (there are no non-hash args before OR it's select_tag)
-            # Otherwise, keep the braces for clarity
+            # Special case: link_to_remote and similar helpers with :url options
+            # These should NOT have outer braces when there's a nested hash as a value
+            is_link_helper = [:link_to_remote, :link_to_function].include?(method_name)
+            
+            # For hash arguments, wrap in curly braces if:
+            # 1. There are multiple hash arguments OR
+            # 2. It's not the last argument OR
+            # 3. It has quoted strings that might cause ambiguity OR
+            # 4. There are non-hash args before AND it has simple values AND it's not select_tag AND it's not a link helper
             is_last = (index == args.length - 1)
-            # Keep braces if there are non-hash args before, unless it's select_tag
-            should_wrap = hash_count > 1 || !is_last || has_nested_hash || has_quoted_strings || (is_last && has_non_hash_before && (!has_only_simple_values || !is_select_tag))
+            should_wrap = hash_count > 1 || !is_last || has_quoted_strings || 
+                         (is_last && has_non_hash_before && has_only_simple_values && !is_select_tag && !is_link_helper)
             extract_content_for_hash(arg, should_wrap)
           elsif [:str, :dstr].include?(arg.type)
             "\"#{extract_content(arg)}\""
@@ -1012,8 +1025,9 @@
         method_name_str = method_name.to_s
 
         # Build the method call
-        # Don't use parentheses for hash arguments - match existing ERB style
-        # Existing ERB files show: ajax_form :url => {...}, :confirm_leave => :save do
+        # Generally don't use parentheses for hash arguments - match existing ERB style
+        # EXCEPT when the first argument is a hash literal - Ruby would interpret {} as a block
+        # e.g., form_tag {:controller => :users} would be parsed as form_tag do |:controller| ...
         if arguments.empty?
           result = if receiver_str.empty?
                      default_instance_variable_name(method_name_str)
@@ -1022,8 +1036,16 @@
                    end
         else
           method_call_str = receiver_str.empty? ? method_name_str : "#{receiver_str}.#{method_name_str}"
-          # No parentheses - Ruby style, matches existing ERB files
-          result = "#{method_call_str} #{arguments}"
+          # Check if the first argument is a hash - if so, we need parentheses
+          # to prevent Ruby from interpreting {} as a block
+          first_arg_is_hash = args.first && args.first.type == :hash
+          if first_arg_is_hash
+            # Use parentheses when first arg is a hash to avoid block ambiguity
+            result = "#{method_call_str}(#{arguments})"
+          else
+            # No parentheses - Ruby style, matches existing ERB files
+            result = "#{method_call_str} #{arguments}"
+          end
         end
         # If it's a statement context and has no arguments, use <% instead of <%=
         erb_code = if statement_context && arguments.empty? && receiver_str.empty?

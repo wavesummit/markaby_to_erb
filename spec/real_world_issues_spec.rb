@@ -681,5 +681,97 @@ RSpec.describe MarkabyToErb::Converter, 'real world issues' do
       expect_conversion(markaby_code, expected_erb)
     end
   end
+
+  # ==========================================================================
+  # Tests for issues that still need fixes (from CONVERSION_ISSUES.md)
+  # ==========================================================================
+
+  describe 'Ruby method definitions (def node)' do
+    it 'raises a clear error for method definitions in views' do
+      markaby_code = <<~'MARKABY'
+        def spacer
+          label {"&nbsp;"}
+        end
+        tr { spacer }
+      MARKABY
+
+      # Method definitions in views should raise a helpful error
+      expect {
+        MarkabyToErb::Converter.new(markaby_code).convert
+      }.to raise_error(MarkabyToErb::ConversionError, /method definition/i)
+    end
+  end
+
+  describe 'form_tag with symbol values' do
+    it 'handles form_tag with symbol values in hash' do
+      markaby_code = <<~'MARKABY'
+        form_tag({:controller => :users, :action => :create}, {:id => 'my_form'})
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <%= form_tag({:controller => :users, :action => :create}, {:id => 'my_form'}) %>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+
+    it 'handles form_tag with mixed string and symbol values' do
+      markaby_code = <<~'MARKABY'
+        form_tag({:controller => 'users', :action => :new}, {:class => 'form'})
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <%= form_tag({:controller => 'users', :action => :new}, {:class => 'form'}) %>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+  end
+
+  describe 'HTML entities before method calls' do
+    it 'handles html_safe with HTML entities' do
+      markaby_code = <<~'MARKABY'
+        p 'Hello &middot; World'.html_safe
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <p><%= 'Hello &middot; World'.html_safe %></p>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+
+    it 'handles link_to_remote with HTML entities' do
+      markaby_code = <<~'MARKABY'
+        link_to_remote 'Lookup &middot;'.html_safe, :url => { :action => 'lookup' }
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <%= link_to_remote 'Lookup &middot;'.html_safe, :url => {:action => 'lookup'} %>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+  end
+
+  describe 'space before parentheses in method chaining' do
+    # Note: This is actually valid Ruby syntax - `td.price (hash)` is calling
+    # `price` with no args, then evaluating `(hash)` separately.
+    # The fix is in the source code, not the converter. But we should handle
+    # the correct form: `td.price(hash)`
+    it 'converts tag.class(hash) with block correctly' do
+      markaby_code = <<~'MARKABY'
+        td.price(:style => 'text-decoration: line-through', :align => 'right') { order_command.price }
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <td style="text-decoration: line-through" align="right" class="price">
+          <%= order_command.price %>
+        </td>
+      ERB
+
+      expect_conversion(markaby_code, expected_erb)
+    end
+  end
 end
 

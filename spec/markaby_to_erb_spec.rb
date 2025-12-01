@@ -299,9 +299,10 @@ RSpec.describe MarkabyToErb::Converter do
       link_to_remote "[+]", :url => {:controller => 'user', :action  => 'assoc_cc_block', :id => user.id}
 
     MARKABY
+    # Note: link_to_remote with :url hash should not have outer braces
     expected_erb = <<~ERB.strip
       <%= "Associated by credit card (\#{user.name}) " %>
-      <%= link_to_remote "[+]", {:url => {:controller => 'user', :action => 'assoc_cc_block', :id => user.id}} %>
+      <%= link_to_remote "[+]", :url => {:controller => 'user', :action => 'assoc_cc_block', :id => user.id} %>
     ERB
 
     expect_conversion(markaby_code, expected_erb)
@@ -671,9 +672,10 @@ RSpec.describe MarkabyToErb::Converter do
         link_to_remote number.to_s, :url => { :action => 'perma_flagged_users', :page => number }
       end
     MARKABY
+    # Note: link_to_remote with :url hash should not have outer braces
     expected_erb = <<~ERB.strip
       <% pagination_links_each user_pages, :window_size => 5 do %>
-        <%= link_to_remote number.to_s, {:url => {:action => 'perma_flagged_users', :page => number}} %>
+        <%= link_to_remote number.to_s, :url => {:action => 'perma_flagged_users', :page => number} %>
       <% end %>
     ERB
     expect_conversion(markaby_code, expected_erb)
@@ -1123,8 +1125,10 @@ RSpec.describe MarkabyToErb::Converter do
       form_tag({:controller => :ssl, :action => :contacts_form}, {:id => 'contact_creation_form', :class => 'ssl-form'})
     MARKABY
 
+    # Note: form_tag with hash as first argument MUST have parentheses
+    # to prevent Ruby from interpreting {} as a block
     expected_erb = <<~ERB.strip
-      <%= form_tag {:controller => :ssl, :action => :contacts_form}, {:id => 'contact_creation_form', :class => 'ssl-form'} %>
+      <%= form_tag({:controller => :ssl, :action => :contacts_form}, {:id => 'contact_creation_form', :class => 'ssl-form'}) %>
     ERB
 
     expect_conversion(markaby_code, expected_erb)

@@ -513,10 +513,14 @@
       end
 
       # Normal method call processing
-      # Special handling for method calls on dstr (like "string".html_safe)
+      # Special handling for method calls on strings (like "string".html_safe or 'string'.html_safe)
       if receiver && receiver.type == :dstr
         dstr_content = extract_dstr(receiver)
         receiver_str = dstr_content
+      elsif receiver && receiver.type == :str
+        # Quote string receivers (e.g., 'Hello &middot; World'.html_safe)
+        str_content = extract_content(receiver)
+        receiver_str = "'#{str_content}'"
       else
         receiver_str = receiver ? extract_content(receiver) : ''
       end
