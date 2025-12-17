@@ -49,16 +49,29 @@
        '"' + string_parts.join + '"'
      end
 
-     def extract_receiver_chain(node)
-       if node.nil?
-         ''
-       elsif node.type == :begin
-         extract_receiver_chain(node.children[0])
-       elsif node.type == :erange
-         rstart = node.children[0].children[0]
-         rend = node.children[1].children[0]
-         "(#{rstart}...#{rend})"
-       elsif node.type == :const
+    def extract_receiver_chain(node)
+      if node.nil?
+        ''
+      elsif node.type == :begin
+        extract_receiver_chain(node.children[0])
+      elsif node.type == :erange
+        # Handle exclusive ranges like 1...10
+        start_node = node.children[0]
+        end_node = node.children[1]
+        start_str = extract_content(start_node)
+        end_str = extract_content(end_node)
+        "(#{start_str}...#{end_str})"
+      elsif node.type == :irange
+        # Handle inclusive ranges like 1..10
+        start_node = node.children[0]
+        end_node = node.children[1]
+        start_str = extract_content(start_node)
+        end_str = extract_content(end_node)
+        "(#{start_str}..#{end_str})"
+      elsif node.type == :array
+        # Handle array literals like [1,2,3] or ['apple', 'banana']
+        extract_content_for_array(node)
+      elsif node.type == :const
          # Handle constants like LINKABLE_ACCOUNT_TYPES
          parent = node.children[0]
          constant_name = node.children[1].to_s
@@ -328,7 +341,7 @@
          when :hash
            extract_content_for_hash(element)
          when :str
-           "\"#{extract_content(element)}\""
+           "'#{extract_content(element)}'"
          when :dstr
            # For dstr in array context, extract without outer quotes and without escaping #
            string_parts = element.children.map do |child|
@@ -379,8 +392,7 @@
      end
 
      def extract_content_for_send(node)
-      receiver, method_name, *arguments = node.children
-      method_name_str = method_name.to_s
+       receiver, method_name, *arguments = node.children
 
        # Special handling for << operator (shovel operator)
        if method_name == :<< && receiver
@@ -513,14 +525,10 @@
       end
 
       # Normal method call processing
-      # Special handling for method calls on strings (like "string".html_safe or 'string'.html_safe)
+      # Special handling for method calls on dstr (like "string".html_safe)
       if receiver && receiver.type == :dstr
         dstr_content = extract_dstr(receiver)
         receiver_str = dstr_content
-      elsif receiver && receiver.type == :str
-        # Quote string receivers (e.g., 'Hello &middot; World'.html_safe)
-        str_content = extract_content(receiver)
-        receiver_str = "'#{str_content}'"
       else
         receiver_str = receiver ? extract_content(receiver) : ''
       end
@@ -562,19 +570,19 @@
       # For helper methods like image_tag, don't use parentheses for single string argument
       if receiver_str.empty?
         if arguments_str.empty?
-          default_instance_variable_name(method_name_str)
+          method_name.to_s
         elsif method_name == :image_tag && arguments.length == 1 && arguments[0].type == :str
           # image_tag with single string argument - no parentheses
           # Use double quotes for image_tag arguments to match test expectations
           str_arg = arguments[0]
           str_content = str_arg.children[0]  # Get the string content directly
           quoted_arg = "\"#{str_content}\""
-          "#{method_name_str} #{quoted_arg}"
+          "#{method_name.to_s} #{quoted_arg}"
         else
-          "#{method_name_str}(#{arguments_str})"
+          "#{method_name.to_s}(#{arguments_str})"
         end
       else
-        receiver_str + '.' + method_name_str + (arguments_str.empty? ? '' : "(#{arguments_str})")
+        receiver_str + '.' + method_name.to_s + (arguments_str.empty? ? '' : "(#{arguments_str})")
       end
      end
 

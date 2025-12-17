@@ -207,7 +207,7 @@ RSpec.describe MarkabyToErb::Converter do
       end
     MARKABY
     expected_erb = <<~ERB.strip
-      <% items = ["Apple", "Banana", "Cherry"] %>
+      <% items = ['Apple', 'Banana', 'Cherry'] %>
       <ul>
         <% items.each do |i,item| %>
           <li><%= item %></li>
@@ -299,10 +299,9 @@ RSpec.describe MarkabyToErb::Converter do
       link_to_remote "[+]", :url => {:controller => 'user', :action  => 'assoc_cc_block', :id => user.id}
 
     MARKABY
-    # Note: link_to_remote with :url hash should not have outer braces
     expected_erb = <<~ERB.strip
       <%= "Associated by credit card (\#{user.name}) " %>
-      <%= link_to_remote "[+]", :url => {:controller => 'user', :action => 'assoc_cc_block', :id => user.id} %>
+      <%= link_to_remote "[+]", {:url => {:controller => 'user', :action => 'assoc_cc_block', :id => user.id}} %>
     ERB
 
     expect_conversion(markaby_code, expected_erb)
@@ -672,10 +671,9 @@ RSpec.describe MarkabyToErb::Converter do
         link_to_remote number.to_s, :url => { :action => 'perma_flagged_users', :page => number }
       end
     MARKABY
-    # Note: link_to_remote with :url hash should not have outer braces
     expected_erb = <<~ERB.strip
       <% pagination_links_each user_pages, :window_size => 5 do %>
-        <%= link_to_remote number.to_s, :url => {:action => 'perma_flagged_users', :page => number} %>
+        <%= link_to_remote number.to_s, {:url => {:action => 'perma_flagged_users', :page => number}} %>
       <% end %>
     ERB
     expect_conversion(markaby_code, expected_erb)
@@ -881,6 +879,86 @@ RSpec.describe MarkabyToErb::Converter do
     expect_conversion(markaby_code, expected_erb)
   end
 
+  it 'converts array literals with integers used with each' do
+    markaby_code = <<~'MARKABY'
+      ul do
+        [30, 60, 120, 365, 730].each do |d|
+          li "Days: #{d}"
+        end
+      end
+    MARKABY
+
+    expected_erb = <<~'ERB'.strip
+      <ul>
+        <% [30, 60, 120, 365, 730].each do |d| %>
+          <li><%= "Days: #{d}" %></li>
+        <% end %>
+      </ul>
+    ERB
+
+    expect_conversion(markaby_code, expected_erb)
+  end
+
+  it 'converts array literals with strings used with each' do
+    markaby_code = <<~'MARKABY'
+      div do
+        ['apple', 'banana', 'cherry'].each do |fruit|
+          p "Fruit: #{fruit}"
+        end
+      end
+    MARKABY
+
+    expected_erb = <<~'ERB'.strip
+      <div>
+        <% ['apple', 'banana', 'cherry'].each do |fruit| %>
+          <p><%= "Fruit: #{fruit}" %></p>
+        <% end %>
+      </div>
+    ERB
+
+    expect_conversion(markaby_code, expected_erb)
+  end
+
+  it 'converts inclusive ranges used with each' do
+    markaby_code = <<~'MARKABY'
+      ul do
+        (2..10).each do |i|
+          li "Item #{i}"
+        end
+      end
+    MARKABY
+
+    expected_erb = <<~'ERB'.strip
+      <ul>
+        <% (2..10).each do |i| %>
+          <li><%= "Item #{i}" %></li>
+        <% end %>
+      </ul>
+    ERB
+
+    expect_conversion(markaby_code, expected_erb)
+  end
+
+  it 'converts inclusive ranges with variables used with each' do
+    markaby_code = <<~'MARKABY'
+      div do
+        (1..high_multiplier).each do |num|
+          span "Number: #{num}"
+        end
+      end
+    MARKABY
+
+    expected_erb = <<~'ERB'.strip
+      <div>
+        <% (1..high_multiplier).each do |num| %>
+          <span><%= "Number: #{num}" %></span>
+        <% end %>
+      </div>
+    ERB
+
+    expect_conversion(markaby_code, expected_erb)
+  end
+
   it 'converts markaby code' do
     markaby_code = <<~MARKABY
       terms.each do |term|
@@ -983,7 +1061,7 @@ RSpec.describe MarkabyToErb::Converter do
     MARKABY
 
     expected_erb = <<~ERB.strip
-      <%= select_tag "card_type[visa]", options_for_select(["Visa"]+["MasterCard"], " "), :style => inputStyle %>
+      <%= select_tag "card_type[visa]", options_for_select(['Visa']+['MasterCard'], " "), :style => inputStyle %>
     ERB
 
     expect_conversion(markaby_code, expected_erb)
@@ -1007,7 +1085,7 @@ RSpec.describe MarkabyToErb::Converter do
     MARKABY
 
     expected_erb = <<~'ERB'.strip
-      <%= select_tag "credit_card[expiration_month]", options_for_select([["Select Month", " "]]+(1..12).collect { |m| ["#{"%02d" % m} - #{Date::ABBR_MONTHNAMES[m]}", "%02d" % m] }, default_month), :style => 'margin-right: 10px;' %>
+      <%= select_tag "credit_card[expiration_month]", options_for_select([['Select Month', ' ']]+(1..12).collect { |m| ["#{"%02d" % m} - #{Date::ABBR_MONTHNAMES[m]}", "%02d" % m] }, default_month), :style => 'margin-right: 10px;' %>
     ERB
 
     expect_conversion(markaby_code, expected_erb)
@@ -1125,10 +1203,8 @@ RSpec.describe MarkabyToErb::Converter do
       form_tag({:controller => :ssl, :action => :contacts_form}, {:id => 'contact_creation_form', :class => 'ssl-form'})
     MARKABY
 
-    # Note: form_tag with hash as first argument MUST have parentheses
-    # to prevent Ruby from interpreting {} as a block
     expected_erb = <<~ERB.strip
-      <%= form_tag({:controller => :ssl, :action => :contacts_form}, {:id => 'contact_creation_form', :class => 'ssl-form'}) %>
+      <%= form_tag {:controller => :ssl, :action => :contacts_form}, {:id => 'contact_creation_form', :class => 'ssl-form'} %>
     ERB
 
     expect_conversion(markaby_code, expected_erb)
