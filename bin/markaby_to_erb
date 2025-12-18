@@ -43,6 +43,10 @@ OptionParser.new do |opts|
     options[:no_validate] = true
   end
 
+  opts.on('--default-to-instance-variables', 'Convert local variables to instance variables by default') do
+    options[:default_to_instance_variables] = true
+  end
+
   opts.on('-h', '--help', 'Displays Help') do
     puts opts
     exit
@@ -100,7 +104,7 @@ def rename_original_file(original_file)
 end
 
 # Method to process a single file
-def process_file(input_file, output_file, rename_old, dry_run: false, verbose: false, validate: true)
+def process_file(input_file, output_file, rename_old, dry_run: false, verbose: false, validate: true, default_to_instance_variables: false)
   begin
     markaby_code = File.read(input_file)
   rescue Errno::ENOENT
@@ -111,7 +115,8 @@ def process_file(input_file, output_file, rename_old, dry_run: false, verbose: f
   begin
     converter = MarkabyToErb::Converter.new(markaby_code, 
                                              verbose: verbose,
-                                             validate_output: validate)
+                                             validate_output: validate,
+                                             default_to_instance_variables: default_to_instance_variables)
     erb_code = converter.convert
     
     if markaby_code.empty?
@@ -177,7 +182,8 @@ if options[:input]
   process_file(input_file, output_file, options[:rename_old],
                dry_run: options[:dry_run],
                verbose: options[:verbose],
-               validate: !options[:no_validate])
+               validate: !options[:no_validate],
+               default_to_instance_variables: options[:default_to_instance_variables])
 
 elsif options[:directory]
   input_dir = options[:directory]
@@ -234,6 +240,7 @@ elsif options[:directory]
     process_file(path, output_path, options[:rename_old],
                  dry_run: options[:dry_run],
                  verbose: options[:verbose],
-                 validate: !options[:no_validate])
+                 validate: !options[:no_validate],
+                 default_to_instance_variables: options[:default_to_instance_variables])
   end
 end
