@@ -47,6 +47,10 @@ OptionParser.new do |opts|
     options[:default_to_instance_variables] = true
   end
 
+  opts.on('-e', '--extension EXT', 'Output file extension (e.g., .erb or .html.erb, default: .html.erb)') do |ext|
+    options[:extension] = ext.start_with?('.') ? ext : ".#{ext}"
+  end
+
   opts.on('-h', '--help', 'Displays Help') do
     puts opts
     exit
@@ -66,16 +70,16 @@ if options[:input] && options[:directory]
 end
 
 # Method to generate output filename based on input filename
-def generate_output_filename(input_file)
+def generate_output_filename(input_file, output_extension = '.html.erb')
   input_dir = File.dirname(input_file)
   input_basename = File.basename(input_file, File.extname(input_file)) # filename without extension
   input_ext = File.extname(input_file)
 
-  # Change .mab or .markaby to .html.erb
+  # Change .mab or .markaby to specified extension (default .html.erb)
   if ['.mab', '.markaby'].include?(input_ext)
-    output_filename = "#{input_basename}.html.erb"
+    output_filename = "#{input_basename}#{output_extension}"
   else
-    output_filename = "#{input_basename}#{input_ext}.html.erb"
+    output_filename = "#{input_basename}#{input_ext}#{output_extension}"
   end
 
   File.join(input_dir, output_filename)
@@ -171,12 +175,13 @@ end
 
 if options[:input]
   input_file = options[:input]
+  output_extension = options[:extension] || '.html.erb'
 
   # Determine output file
   output_file = if options[:output]
                   options[:output]
                 else
-                  generate_output_filename(input_file)
+                  generate_output_filename(input_file, output_extension)
                 end
 
   process_file(input_file, output_file, options[:rename_old],
@@ -187,6 +192,7 @@ if options[:input]
 
 elsif options[:directory]
   input_dir = options[:directory]
+  output_extension = options[:extension] || '.html.erb'
 
   unless Dir.exist?(input_dir)
     puts "Input directory not found: #{input_dir}"
@@ -223,8 +229,8 @@ elsif options[:directory]
     relative_path = path.sub(/^#{Regexp.escape(input_dir)}\/?/, '')
     output_path = File.join(output_dir, relative_path)
 
-    # Change the extension to .html.erb
-    output_path = output_path.sub(/(\.mab|\.markaby)$/i, '.html.erb')
+    # Change the extension to specified extension (default .html.erb)
+    output_path = output_path.sub(/(\.mab|\.markaby)$/i, output_extension)
 
     # Ensure the output directory exists
     output_file_dir = File.dirname(output_path)
