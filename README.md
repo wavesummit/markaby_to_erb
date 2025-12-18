@@ -97,11 +97,17 @@ puts erb_code
 
 You can opt-in to treating bare identifiers in tag content as instance variables—handy when older Markaby views assume everything is an `@var`.
 
+**Programmatic API:**
 ```ruby
 converter = MarkabyToErb::Converter.new(
   markaby_code,
   default_to_instance_variables: true
 )
+```
+
+**Command Line:**
+```bash
+markaby_to_erb -i file.mab --default-to-instance-variables
 ```
 
 When enabled, identifiers such as `dialog_heading` become `@dialog_heading`, while helper calls or `_path`/`_url` methods are left untouched.
@@ -114,7 +120,13 @@ When enabled, identifiers such as `dialog_heading` become `@dialog_heading`, whi
 markaby_to_erb -i app/views/layouts/application.mab
 ```
 
-This creates `app/views/layouts/application.html.erb` in the same directory.
+This creates `app/views/layouts/application.html.erb` in the same directory (default extension is `.html.erb`).
+
+For Rails 2.3 compatibility, use the `-e` option to specify `.erb`:
+
+```bash
+markaby_to_erb -i app/views/layouts/application.mab -e .erb
+```
 
 #### Convert a directory
 
@@ -137,7 +149,7 @@ markaby_to_erb -d app/views -o converted_views
 markaby_to_erb -i file.mab -r
 ```
 
-Renames `file.mab` to `file_old.mab.rb` after conversion.
+Renames `file.mab` to `file.mab.old` after conversion.
 
 #### CLI Options
 
@@ -145,11 +157,53 @@ Renames `file.mab` to `file_old.mab.rb` after conversion.
 Usage: markaby_to_erb [options]
 
 Options:
-  -i, --input FILE              Input Markaby file
-  -d, --directory DIR          Input directory containing Markaby files
-  -o, --output FILE_OR_DIR      Output ERB file or directory (optional)
-  -r, --rename-old              Rename original Markaby file by appending _old
-  -h, --help                    Displays Help
+  -i, --input FILE                 Input Markaby file
+  -d, --directory DIR              Input directory containing Markaby files
+  -o, --output FILE_OR_DIR         Output ERB file or directory (optional)
+  -r, --rename-old                 Rename original Markaby file by appending _old to its name
+  -v, --verbose                    Enable verbose logging
+      --dry-run                    Preview changes without writing files
+      --no-validate                Skip output validation
+      --default-to-instance-variables
+                                   Convert local variables to instance variables by default
+  -e, --extension EXT              Output file extension (e.g., .erb or .html.erb, default: .html.erb)
+  -h, --help                       Displays Help
+```
+
+#### Additional CLI Examples
+
+**Rails 2.3 compatibility (use .erb extension):**
+
+```bash
+markaby_to_erb -i app/views/layouts/application.mab -e .erb
+```
+
+This creates `app/views/layouts/application.erb` instead of the default `.html.erb`.
+
+**Enable default to instance variables:**
+
+```bash
+markaby_to_erb -i file.mab --default-to-instance-variables
+```
+
+This treats bare identifiers in tag content as instance variables (e.g., `dialog_heading` becomes `@dialog_heading`).
+
+**Preview changes without writing files:**
+
+```bash
+markaby_to_erb -i file.mab --dry-run
+```
+
+**Verbose logging:**
+
+```bash
+markaby_to_erb -i file.mab -v
+```
+
+**Skip output validation:**
+
+```bash
+markaby_to_erb -i file.mab --no-validate
 ```
 
 ## Examples
