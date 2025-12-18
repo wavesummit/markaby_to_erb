@@ -762,8 +762,16 @@
           if value_node.type == :op_asgn
             process_op_asgn(value_node)
           else
+            if value_node.type == :if
+              condition, if_body, else_body = value_node.children
+              true_value = inline_markaby_html?(if_body) ? raw_inline_html(if_body) : format_ternary_value(if_body)
+              false_value = inline_markaby_html?(else_body) ? raw_inline_html(else_body) : format_ternary_value(else_body)
+              condition_str = extract_content(condition)
+              value = "#{condition_str} ? #{true_value} : #{false_value}"
+            elsif inline_markaby_html?(value_node)
+              value = raw_inline_html(value_node)
             # Handle blocks (e.g., (1..15).collect { |n| [n, n] })
-            if value_node.type == :block
+            elsif value_node.type == :block
               # Check if this is a capture block
               block_method_call = value_node.children[0]
               if block_method_call && block_method_call.type == :send && block_method_call.children[1] == :capture
@@ -843,8 +851,17 @@
       def process_method(node, statement_context: false)
         receiver, method_name, *args = node.children
         
+        # If the first argument is Markaby-style inline HTML, convert it to a raw HTML string
+        args = args.map.with_index do |arg, idx|
+          if inline_markaby_html?(arg)
+            raw_inline_html(arg)
+          else
+            arg
+          end
+        end
+        
         # Special handling for javascript_tag with dynamic strings
-        if method_name == :javascript_tag && args.first && args.first.type == :dstr
+        if method_name == :javascript_tag && args.first && args.first.is_a?(Parser::AST::Node) && args.first.type == :dstr
           process_javascript_tag_with_interpolation(node, args.first)
           return
         end
@@ -853,7 +870,7 @@
         # These need special handling to convert #{...} to ERB tags
         # Only treat as heredoc if it's a multi-line string (contains newlines)
         heredoc_arg_index = args.find_index do |arg|
-          arg.type == :dstr && has_interpolation?(arg) && 
+          arg.is_a?(Parser::AST::Node) && arg.type == :dstr && has_interpolation?(arg) && 
           arg.children.any? { |child| child.type == :str && child.children[0].include?("\n") }
         end
         if heredoc_arg_index
@@ -862,7 +879,7 @@
         end
         
         # Check if first argument is a capture block
-        first_arg_is_capture = args.first && args.first.type == :block && 
+        first_arg_is_capture = args.first && args.first.is_a?(Parser::AST::Node) && args.first.type == :block && 
                                args.first.children[0] && args.first.children[0].type == :send &&
                                args.first.children[0].children[1] == :capture
         
@@ -912,9 +929,12 @@
         end
         
         # Count how many hash arguments we have
-        hash_count = args.count { |arg| arg.type == :hash }
+        hash_count = args.count { |arg| arg.is_a?(Parser::AST::Node) && arg.type == :hash }
         arguments = args.map.with_index do |arg, index|
-          if arg.type == :hash
+          if arg.is_a?(String)
+            # Already-converted inline raw HTML string
+            arg
+          elsif arg.is_a?(Parser::AST::Node) && arg.type == :hash
             # Check if hash contains nested hashes (complex structure)
             has_nested_hash = arg.children.any? do |pair|
               pair.children[1] && pair.children[1].type == :hash
@@ -941,7 +961,7 @@
             end
             
             # Check if there are non-hash arguments before this hash
-            has_non_hash_before = args[0...index].any? { |a| a.type != :hash }
+            has_non_hash_before = args[0...index].any? { |a| !a.is_a?(Parser::AST::Node) || a.type != :hash }
             
             # Special case: select_tag expects no braces even with non-hash args before
             is_select_tag = method_name == :select_tag
@@ -957,7 +977,7 @@
             # Keep braces if there are non-hash args before, unless it's select_tag
             should_wrap = hash_count > 1 || !is_last || has_nested_hash || has_quoted_strings || (is_last && has_non_hash_before && (!has_only_simple_values || !is_select_tag))
             extract_content_for_hash(arg, should_wrap)
-          elsif [:str, :dstr].include?(arg.type)
+          elsif arg.is_a?(Parser::AST::Node) && [:str, :dstr].include?(arg.type)
             "\"#{extract_content(arg)}\""
           else
             extract_content(arg)
@@ -1499,6 +1519,142 @@
           child.is_a?(Parser::AST::Node) &&
             ([:array, :hash].include?(child.type) || contains_complex_structure?(child))
         end
+      end
+
+      # Detect whether a node represents inline Markaby HTML (e.g., div {...} or div + span)
+      def inline_markaby_html?(node)
+        return false if node.nil?
+
+        case node.type
+        when :begin
+          node.children.any? { |child| inline_markaby_html?(child) }
+        when :block
+          method_call = node.children[0]
+          html_tag, = extract_html_tag_and_attributes(method_call)
+          !!html_tag
+        when :send
+          html_tag, = extract_html_tag_and_attributes(node)
+          return true if html_tag
+
+          receiver, method_name, *args = node.children
+          if method_name == :+
+            inline_markaby_html?(receiver) || args.any? { |a| inline_markaby_html?(a) }
+          else
+            false
+          end
+        else
+          false
+        end
+      end
+
+      def inline_attribute_value(node)
+        return '' if node.nil?
+
+        case node.type
+        when :str
+          node.children[0]
+        when :dstr
+          extract_content_for_dstr(node)
+        else
+          "\#{#{extract_content(node)}}"
+        end
+      end
+
+      def format_ternary_value(node)
+        return "''" if node.nil?
+
+        case node.type
+        when :str
+          "'#{extract_content(node)}'"
+        when :dstr
+          "\"#{extract_content_for_dstr(node)}\""
+        else
+          extract_content(node)
+        end
+      end
+
+      def inline_attributes(args, classes, ids)
+        attributes = {}
+
+        args.select { |arg| arg.is_a?(Parser::AST::Node) && arg.type == :hash }.each do |hash|
+          hash.children.each do |pair|
+            key_node, value_node = pair.children
+            key_name = key_node.children[0].to_s.gsub(':', '')
+            attributes[key_name] = inline_attribute_value(value_node)
+          end
+        end
+
+        if classes.any?
+          existing_classes = attributes['class']
+          merged = [existing_classes, classes.map(&:to_s)].compact.flatten.join(' ').strip
+          attributes['class'] = merged unless merged.empty?
+        end
+
+        if ids.any?
+          existing_ids = attributes['id']
+          merged = [existing_ids, ids.map(&:to_s)].compact.flatten.join(' ').strip
+          attributes['id'] = merged unless merged.empty?
+        end
+
+        attributes.map { |k, v| v.nil? ? nil : %( #{k}="#{v}") }.compact.join
+      end
+
+      def convert_inline_html(node)
+        return '' if node.nil?
+
+        case node.type
+        when :begin
+          node.children.map { |child| convert_inline_html(child) }.join
+        when :block
+          method_call, _args, body = node.children
+          html_tag, classes, ids = extract_html_tag_and_attributes(method_call)
+
+          if html_tag
+            attributes = inline_attributes(method_call.children.drop(2), classes, ids)
+            content = convert_inline_html(body)
+
+            if content.empty? && self_closing_tag?(html_tag)
+              "<#{html_tag}#{attributes} />"
+            else
+              "<#{html_tag}#{attributes}>#{content}</#{html_tag}>"
+            end
+          else
+            "\#{#{extract_block_expression(node)}}"
+          end
+        when :send
+          receiver, method_name, *args = node.children
+
+          if method_name == :+ && args.first
+            convert_inline_html(receiver) + convert_inline_html(args.first)
+          else
+            html_tag, classes, ids = extract_html_tag_and_attributes(node)
+
+            if html_tag
+              attributes = inline_attributes(args, classes, ids)
+              content = args.reject { |a| a.type == :hash }.map { |arg| convert_inline_html(arg) }.join
+
+              if content.empty? && self_closing_tag?(html_tag)
+                "<#{html_tag}#{attributes} />"
+              else
+                "<#{html_tag}#{attributes}>#{content}</#{html_tag}>"
+              end
+            else
+              "\#{#{extract_content(node)}}"
+            end
+          end
+        when :str
+          node.children[0]
+        when :dstr
+          extract_content_for_dstr(node)
+        else
+          "\#{#{extract_content(node)}}"
+        end
+      end
+
+      def raw_inline_html(node)
+        html_string = convert_inline_html(node)
+        escaped = html_string.gsub('\\', '\\\\').gsub('"', '\"').gsub("\n", '')
+        %Q(raw("#{escaped}"))
       end
 
     end
