@@ -143,7 +143,9 @@ RSpec.describe MarkabyToErb::Converter, 'real world issues' do
   end
 
   describe 'JavaScript string interpolation' do
-    it 'converts string interpolation in JavaScript strings to ERB' do
+    it 'converts string interpolation in JavaScript strings to Ruby interpolation' do
+      # Issue: JavaScript heredocs should use Ruby interpolation with j() for HTML escaping
+      # NOT ERB tags, because ERB tags inside heredocs cause syntax errors
       markaby_code = <<~'MARKABY'
         javascript_tag %{
           var url = '/resource/asset/image/manage' + '#{@collection ? "/collection/" + @collection.permalink : ""}';
@@ -152,13 +154,14 @@ RSpec.describe MarkabyToErb::Converter, 'real world issues' do
 
       expected_erb = <<~'ERB'.strip
         <%= javascript_tag %{
-          var url = '/resource/asset/image/manage' + '<%= @collection ? "/collection/" + @collection.permalink  : "" %>';
+          var url = '/resource/asset/image/manage' + '#{j(@collection ? '/collection/' + @collection.permalink  : '')}';
         } %>
       ERB
       expect_conversion(markaby_code, expected_erb)
     end
 
     it 'converts image_tag in JavaScript string interpolation' do
+      # Issue: Helper calls inside JavaScript heredocs should use #{j(...)} NOT <%= ... %>
       markaby_code = <<~'MARKABY'
         javascript_tag %{
           $('#asterion_theme_list').html('<div>#{image_tag "loading_black.gif"}</div>');
@@ -167,13 +170,14 @@ RSpec.describe MarkabyToErb::Converter, 'real world issues' do
 
       expected_erb = <<~'ERB'.strip
         <%= javascript_tag %{
-          $('#asterion_theme_list').html('<div><%= image_tag "loading_black.gif" %></div>');
+          $('#asterion_theme_list').html('<div>#{j(image_tag "loading_black.gif")}</div>');
         } %>
       ERB
       expect_conversion(markaby_code, expected_erb)
     end
 
     it 'converts translation calls in JavaScript string interpolation' do
+      # Issue: Translation calls inside JavaScript heredocs should use #{j(t(...))} NOT <%= t(...) %>
       markaby_code = <<~'MARKABY'
         javascript_tag %{
           $('#el').html('#{t(".your_comment_is_being_updated")}');
@@ -182,13 +186,14 @@ RSpec.describe MarkabyToErb::Converter, 'real world issues' do
 
       expected_erb = <<~'ERB'.strip
         <%= javascript_tag %{
-          $('#el').html('<%= t(".your_comment_is_being_updated") %>');
+          $('#el').html('#{j(t('.your_comment_is_being_updated'))}');
         } %>
       ERB
       expect_conversion(markaby_code, expected_erb)
     end
 
     it 'converts hash access in JavaScript string interpolation' do
+      # Issue: Hash access inside JavaScript heredocs should use #{j(...)} NOT <%= ... %>
       markaby_code = <<~'MARKABY'
         javascript_tag %{
           var data = { pageviews: #{@flot_json[:pageviews]}, visits: #{@flot_json[:visits]} };
@@ -197,7 +202,85 @@ RSpec.describe MarkabyToErb::Converter, 'real world issues' do
 
       expected_erb = <<~'ERB'.strip
         <%= javascript_tag %{
-          var data = { pageviews: <%= @flot_json[:pageviews] %>, visits: <%= @flot_json[:visits] %> };
+          var data = { pageviews: #{j(@flot_json[:pageviews])}, visits: #{j(@flot_json[:visits])} };
+        } %>
+      ERB
+      expect_conversion(markaby_code, expected_erb)
+    end
+
+    it 'converts string interpolation in JavaScript heredoc to Ruby interpolation (not ERB tags)' do
+      # Issue: When Markaby uses #{variable} inside javascript_tag heredoc,
+      # it should convert to #{j(variable)} NOT <%= variable %>
+      # ERB tags inside heredocs cause syntax errors
+      markaby_code = <<~'MARKABY'
+        javascript_tag %{
+          (function($){
+            if ($('#like_url input').val() == '') {
+              $('#like_url input').val('#{website.url}');
+            }
+          }($j));
+        }
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <%= javascript_tag %{
+          (function($){
+            if ($('#like_url input').val() == '') {
+              $('#like_url input').val('#{j(website.url)}');
+            }
+          }($j));
+        } %>
+      ERB
+      expect_conversion(markaby_code, expected_erb)
+    end
+
+    it 'converts translation calls in JavaScript heredoc to Ruby interpolation' do
+      # Issue: Translation calls inside javascript_tag heredoc should use #{j(t(...))}
+      # NOT <%= t(...) %> to avoid syntax errors
+      markaby_code = <<~'MARKABY'
+        javascript_tag %{
+          (function($){
+            $.asterion.confirm_delete({
+              link_target  : 'a.confirm_delete',
+              title        : '#{t('.delete_comment')}',
+              msg_target   : 'span.delete_comment',
+              button1_txt  : '#{t('.delete_comment')}'
+            });
+          })($j);
+        }
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <%= javascript_tag %{
+          (function($){
+            $.asterion.confirm_delete({
+              link_target  : 'a.confirm_delete',
+              title        : '#{j(t('.delete_comment'))}',
+              msg_target   : 'span.delete_comment',
+              button1_txt  : '#{j(t('.delete_comment'))}'
+            });
+          })($j);
+        } %>
+      ERB
+      expect_conversion(markaby_code, expected_erb)
+    end
+
+    it 'converts instance variables in JavaScript heredoc to Ruby interpolation' do
+      # Issue: Instance variables inside javascript_tag heredoc should use #{j(@variable)}
+      # NOT <%= @variable %> to avoid syntax errors
+      markaby_code = <<~'MARKABY'
+        javascript_tag %{
+          (function($){
+            $('#component_tag').html('<option value="">#{t('.display_all')}</option>');
+          })($j);
+        }
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <%= javascript_tag %{
+          (function($){
+            $('#component_tag').html('<option value="">#{j(t('.display_all'))}</option>');
+          })($j);
         } %>
       ERB
       expect_conversion(markaby_code, expected_erb)

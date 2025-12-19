@@ -588,8 +588,10 @@
 
       def process_method_with_heredoc_interpolation(node, dstr_node, arg_index)
         # Process method call with heredoc string argument containing interpolation
-        # Convert #{...} interpolations to ERB tags while preserving the heredoc structure
+        # For javascript_tag, convert #{...} to #{j(...)} (Ruby interpolation with HTML escaping)
+        # For other methods, convert #{...} to ERB tags
         receiver, method_name, *args = node.children
+        is_javascript_tag = method_name == :javascript_tag
         
         # Build arguments before the heredoc
         args_before = args[0...arg_index]
@@ -621,10 +623,15 @@
           end
         end
         
-        # Build the heredoc content, replacing #{...} with <%= ... %>
+        # Build the heredoc content
+        # For javascript_tag, use Ruby interpolation with j() for HTML escaping
+        # For other methods, use ERB tags
         heredoc_content = heredoc_parts.map do |part|
           if part[:type] == :string
             part[:content]
+          elsif is_javascript_tag
+            # Use Ruby string interpolation with j() for HTML escaping, NOT ERB tags
+            "\#{j(#{part[:content]})}"
           else
             "<%= #{part[:content]} %>"
           end
@@ -682,7 +689,8 @@
 
       def process_javascript_tag_with_interpolation(node, dstr_node)
         # Process javascript_tag with dynamic string that contains interpolations
-        # Convert #{...} interpolations to ERB tags while preserving the heredoc structure
+        # Convert #{...} interpolations to Ruby string interpolation with j() for HTML escaping
+        # NOT ERB tags, because ERB tags inside heredocs cause syntax errors
         # Reconstruct the JavaScript string by walking through dstr children
         js_content_parts = []
         dstr_node.children.each do |child|
@@ -691,13 +699,9 @@
             # Static string part - keep as-is
             js_content_parts << child.children[0]
           when :begin, :evstr
-            # Interpolation - replace #{...} with <%= ... %>
+            # Interpolation - replace #{...} with #{j(...)} for HTML escaping
             interpolation_code = extract_content(child.children.first)
-            # Normalize quotes in interpolation - use double quotes for consistency
-            # Convert single quotes to double quotes, including empty strings
-            if interpolation_code.include?("'") && !interpolation_code.include?('"')
-              interpolation_code = interpolation_code.gsub(/'/, '"')
-            end
+            # Preserve original quote style - don't normalize quotes
             # Check if interpolation contains a ternary operator and preserve spacing for JS strings
             # In JavaScript strings, ternary operators should have space after colon: condition ? true : false
             # The interpolation code from extract_content has :"" (no space), we need : "" (with space)
@@ -706,7 +710,8 @@
               # Replace :"" with : "" and :'' with : '' (add space before colon)
               interpolation_code = interpolation_code.gsub(/:\s*(""|'')/, ' : \1')
             end
-            js_content_parts << "<%= #{interpolation_code} %>"
+            # Use Ruby string interpolation with j() for HTML escaping, NOT ERB tags
+            js_content_parts << "\#{j(#{interpolation_code})}"
           end
         end
         
@@ -716,18 +721,29 @@
         # Output the javascript_tag call with heredoc
         # Split into lines to preserve formatting
         js_lines = js_content.split("\n", -1)
+        
+        # Find minimum indentation (excluding empty lines) to normalize relative indentation
+        non_empty_lines = js_lines.reject { |l| l.strip.empty? }
+        min_indent = if non_empty_lines.any?
+                      non_empty_lines.map { |l| l[/\A */].size }.min
+                    else
+                      0
+                    end
+        
         add_line("<%= javascript_tag %{", :process_javascript_tag_with_interpolation)
         js_lines.each_with_index do |line, idx|
-          # Preserve original indentation (2 spaces for content lines)
           # Skip empty lines at start/end, but keep internal empty lines
           if line.empty?
             # Only add empty line if it's not at the start or end
             next if idx == 0 || idx == js_lines.length - 1
             add_line("", :process_javascript_tag_with_interpolation)
           else
-            # Strip any existing leading whitespace and add exactly 2 spaces
+            # Normalize indentation: subtract minimum indent, then add 2 spaces base indent
+            current_indent = line[/\A */].size
+            normalized_indent = current_indent - min_indent
             stripped_line = line.lstrip
-            add_line("  #{stripped_line}", :process_javascript_tag_with_interpolation)
+            indent_spaces = "  " + ("  " * (normalized_indent / 2))
+            add_line("#{indent_spaces}#{stripped_line}", :process_javascript_tag_with_interpolation)
           end
         end
         add_line("} %>", :process_javascript_tag_with_interpolation)
