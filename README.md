@@ -112,6 +112,31 @@ markaby_to_erb -i file.mab --default-to-instance-variables
 
 When enabled, identifiers such as `dialog_heading` become `@dialog_heading`, while helper calls or `_path`/`_url` methods are left untouched.
 
+#### Variable List Options
+
+You can specify explicit lists of variables that should be treated as instance variables or local variables. This provides fine-grained control over variable conversion.
+
+**Programmatic API:**
+```ruby
+converter = MarkabyToErb::Converter.new(
+  markaby_code,
+  instance_variables: ['user', 'item', 'form'],
+  local_variables: ['counter', 'index', 'value']
+)
+```
+
+**Command Line:**
+```bash
+markaby_to_erb -i file.mab --instance-variables "user,item,form" --local-variables "counter,index"
+```
+
+**Behavior:**
+- Variables in the `instance_variables` list are converted to instance variables (e.g., `user` → `@user`)
+- Variables in the `local_variables` list are kept as local variables (e.g., `@user` → `user`)
+- Variable lists take precedence over `default_to_instance_variables`
+- If a variable appears in both lists, `instance_variables` takes precedence
+- Variables not in either list follow the default behavior or `default_to_instance_variables` setting
+
 ### Command-Line Interface
 
 #### Convert a single file
@@ -166,6 +191,8 @@ Options:
       --no-validate                Skip output validation
       --default-to-instance-variables
                                    Convert local variables to instance variables by default
+      --instance-variables LIST    Comma-separated list of variable names to treat as instance variables
+      --local-variables LIST       Comma-separated list of variable names to treat as local variables
   -e, --extension EXT              Output file extension (e.g., .erb or .html.erb, default: .html.erb)
   -h, --help                       Displays Help
 ```
@@ -187,6 +214,14 @@ markaby_to_erb -i file.mab --default-to-instance-variables
 ```
 
 This treats bare identifiers in tag content as instance variables (e.g., `dialog_heading` becomes `@dialog_heading`).
+
+**Specify variable lists:**
+
+```bash
+markaby_to_erb -i file.mab --instance-variables "user,item,form" --local-variables "counter,index"
+```
+
+This treats `user`, `item`, and `form` as instance variables, while `counter` and `index` are kept as local variables.
 
 **Preview changes without writing files:**
 

@@ -20,6 +20,8 @@ module MarkabyToErb
       @current_line = 1
       @validate_output = options.fetch(:validate_output, true)
       @default_to_instance_variables = options.fetch(:default_to_instance_variables, false)
+      @instance_variables = options.fetch(:instance_variables, []).map(&:to_s).map { |v| v.start_with?('@') ? v[1..-1] : v }
+      @local_variables = options.fetch(:local_variables, []).map(&:to_s).map { |v| v.start_with?('@') ? v[1..-1] : v }
       @verbose = options.fetch(:verbose, false)
       @logger = options.fetch(:logger, nil)
       @logger ||= Logger.new($stdout) if @verbose

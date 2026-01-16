@@ -41,15 +41,32 @@ module MarkabyToErb
     end
 
     def default_instance_variable_name(name)
-      return name unless defined?(@default_to_instance_variables) && @default_to_instance_variables
-
       name_str = name.to_s
-      return name_str if name_str.start_with?('@')
-      return name_str unless name_str.match?(/\A[a-z_]\w*\z/)
-      return name_str if path_helper_name?(name_str)
-      return name_str if helper_call?(name_str)
+      base_name = name_str.start_with?('@') ? name_str[1..-1] : name_str
+      
+      # If explicitly listed as instance variable, convert to @variable
+      instance_vars = instance_variable_get(:@instance_variables) rescue []
+      if instance_vars.is_a?(Array) && instance_vars.include?(base_name)
+        return name_str.start_with?('@') ? name_str : "@#{name_str}"
+      end
+      
+      # If explicitly listed as local variable, keep as local (remove @ if present)
+      local_vars = instance_variable_get(:@local_variables) rescue []
+      if local_vars.is_a?(Array) && local_vars.include?(base_name)
+        return name_str.start_with?('@') ? name_str[1..-1] : name_str
+      end
+      
+      # If default_to_instance_variables is enabled, apply default behavior
+      default_to_ivars = instance_variable_get(:@default_to_instance_variables) rescue false
+      if default_to_ivars
+        return name_str if name_str.start_with?('@')
+        return name_str unless name_str.match?(/\A[a-z_]\w*\z/)
+        return name_str if path_helper_name?(name_str)
+        return name_str if helper_call?(name_str)
+        return "@#{name_str}"
+      end
 
-      "@#{name_str}"
+      return name.to_s
     end
 
     def path_helper_name?(name)

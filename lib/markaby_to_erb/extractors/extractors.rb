@@ -86,8 +86,16 @@
          else
            constant_name
          end
-       elsif node.type == :ivar || node.type == :cvar || node.type == :gvar
-         # Handle instance/class/global variables
+       elsif node.type == :lvar
+         # Handle local variables - apply variable name conversion
+         var_name = node.children[0].to_s
+         default_instance_variable_name(var_name)
+       elsif node.type == :ivar
+         # Handle instance variables - apply variable name conversion
+         var_name = node.children[0].to_s
+         default_instance_variable_name(var_name)
+       elsif node.type == :cvar || node.type == :gvar
+         # Handle class/global variables
          node.children[0].to_s
        elsif node.type == :send
          # Recursively extract the method chain
@@ -164,8 +172,16 @@
          ":#{node.children[0]}"
        when :lvasgn
          node.children[0].to_s
-       when :lvar, :cvar, :ivar, :gvar
-         node.children[0].to_s
+      when :lvar
+        # Apply variable name conversion (instance/local variable lists)
+        var_name = node.children[0].to_s
+        default_instance_variable_name(var_name)
+      when :ivar
+        # Apply variable name conversion (instance/local variable lists)
+        var_name = node.children[0].to_s
+        default_instance_variable_name(var_name)
+      when :cvar, :gvar
+        node.children[0].to_s
       when :begin
         # assuming only one child
         extract_content(node.children[0])
@@ -529,6 +545,11 @@
       if receiver && receiver.type == :dstr
         dstr_content = extract_dstr(receiver)
         receiver_str = dstr_content
+      elsif receiver && receiver.type == :send && receiver.children[0].nil? && receiver.children[2..-1].empty?
+        # Receiver is a method call with no receiver and no arguments (e.g., `user` in `user.name`)
+        # Treat it as a potential variable and apply variable name conversion
+        receiver_method_name = receiver.children[1]
+        receiver_str = default_instance_variable_name(receiver_method_name)
       else
         receiver_str = receiver ? extract_content(receiver) : ''
       end
@@ -570,7 +591,9 @@
       # For helper methods like image_tag, don't use parentheses for single string argument
       if receiver_str.empty?
         if arguments_str.empty?
-          method_name.to_s
+          # Standalone method call with no receiver and no arguments (e.g., `counter` in `span counter`)
+          # Treat it as a potential variable and apply variable name conversion
+          default_instance_variable_name(method_name)
         elsif method_name == :image_tag && arguments.length == 1 && arguments[0].type == :str
           # image_tag with single string argument - no parentheses
           # Use double quotes for image_tag arguments to match test expectations

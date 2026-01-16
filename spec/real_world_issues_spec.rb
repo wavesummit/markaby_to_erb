@@ -413,5 +413,126 @@ RSpec.describe MarkabyToErb::Converter, 'real world issues' do
       expect_conversion(markaby_code, expected_erb)
     end
   end
+
+  describe 'variable list options' do
+    it 'treats specified variables as instance variables' do
+      markaby_code = <<~'MARKABY'
+        div do
+          h1 user.name
+          p item.description
+          span counter
+        end
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <div>
+          <h1><%= @user.name %></h1>
+          <p><%= @item.description %></p>
+          <span><%= counter %></span>
+        </div>
+      ERB
+
+      converter = MarkabyToErb::Converter.new(markaby_code, 
+                                             instance_variables: ['user', 'item'],
+                                             validate_output: false)
+      erb_code = converter.convert
+      expect(erb_code.strip).to eq(expected_erb.strip)
+    end
+
+    it 'treats specified variables as local variables' do
+      markaby_code = <<~'MARKABY'
+        div do
+          h1 @user.name
+          p @item.description
+          span @counter
+        end
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <div>
+          <h1><%= user.name %></h1>
+          <p><%= item.description %></p>
+          <span><%= @counter %></span>
+        </div>
+      ERB
+
+      converter = MarkabyToErb::Converter.new(markaby_code, 
+                                             local_variables: ['user', 'item'],
+                                             validate_output: false)
+      erb_code = converter.convert
+      expect(erb_code.strip).to eq(expected_erb.strip)
+    end
+
+    it 'instance variable list takes precedence over default_to_instance_variables' do
+      markaby_code = <<~'MARKABY'
+        div do
+          h1 user.name
+          p item.description
+          span counter
+        end
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <div>
+          <h1><%= @user.name %></h1>
+          <p><%= @item.description %></p>
+          <span><%= @counter %></span>
+        </div>
+      ERB
+
+      converter = MarkabyToErb::Converter.new(markaby_code, 
+                                             default_to_instance_variables: true,
+                                             instance_variables: ['user'],
+                                             validate_output: false)
+      erb_code = converter.convert
+      expect(erb_code.strip).to eq(expected_erb.strip)
+    end
+
+    it 'local variable list takes precedence over default_to_instance_variables' do
+      markaby_code = <<~'MARKABY'
+        div do
+          h1 user.name
+          p item.description
+          span counter
+        end
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <div>
+          <h1><%= user.name %></h1>
+          <p><%= @item.description %></p>
+          <span><%= @counter %></span>
+        </div>
+      ERB
+
+      converter = MarkabyToErb::Converter.new(markaby_code, 
+                                             default_to_instance_variables: true,
+                                             local_variables: ['user'],
+                                             validate_output: false)
+      erb_code = converter.convert
+      expect(erb_code.strip).to eq(expected_erb.strip)
+    end
+
+    it 'instance variable list takes precedence over local variable list' do
+      markaby_code = <<~'MARKABY'
+        div do
+          h1 user.name
+        end
+      MARKABY
+
+      expected_erb = <<~'ERB'.strip
+        <div>
+          <h1><%= @user.name %></h1>
+        </div>
+      ERB
+
+      converter = MarkabyToErb::Converter.new(markaby_code, 
+                                             instance_variables: ['user'],
+                                             local_variables: ['user'],
+                                             validate_output: false)
+      erb_code = converter.convert
+      expect(erb_code.strip).to eq(expected_erb.strip)
+    end
+  end
 end
 
