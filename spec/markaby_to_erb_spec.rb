@@ -301,7 +301,7 @@ RSpec.describe MarkabyToErb::Converter do
     MARKABY
     expected_erb = <<~ERB.strip
       <%= "Associated by credit card (\#{user.name}) " %>
-      <%= link_to_remote "[+]", {:url => {:controller => 'user', :action => 'assoc_cc_block', :id => user.id}} %>
+      <%= link_to_remote "[+]", :url => {:controller => 'user', :action => 'assoc_cc_block', :id => user.id} %>
     ERB
 
     expect_conversion(markaby_code, expected_erb)
@@ -672,8 +672,8 @@ RSpec.describe MarkabyToErb::Converter do
       end
     MARKABY
     expected_erb = <<~ERB.strip
-      <% pagination_links_each user_pages, :window_size => 5 do %>
-        <%= link_to_remote number.to_s, {:url => {:action => 'perma_flagged_users', :page => number}} %>
+      <% pagination_links_each user_pages, :window_size => 5 do |number| %>
+        <%= link_to_remote number.to_s, :url => {:action => 'perma_flagged_users', :page => number} %>
       <% end %>
     ERB
     expect_conversion(markaby_code, expected_erb)
@@ -1109,7 +1109,7 @@ RSpec.describe MarkabyToErb::Converter do
     MARKABY
 
     expected_erb = <<~'ERB'.strip
-      <%= link_to_remote "Click here to manage these records.", {:before => $('loadingDiv').innerHTML=#{image_tag("interface/lightbox/progressbar.gif", {:alt => 'loading'}).dump} + ' Loading ... Please Wait ...', :complete => "$('loadingDiv').innerHTML=''", :url => {:controller => 'dns', :action => 'advanced_dns_block', :domain_name => params[:domain_name]}} %>
+      <%= link_to_remote "Click here to manage these records.", :before => $('loadingDiv').innerHTML=#{image_tag("interface/lightbox/progressbar.gif", {:alt => 'loading'}).dump} + ' Loading ... Please Wait ...', :complete => "$('loadingDiv').innerHTML=''", :url => {:controller => 'dns', :action => 'advanced_dns_block', :domain_name => params[:domain_name]} %>
     ERB
 
     expect_conversion(markaby_code, expected_erb)

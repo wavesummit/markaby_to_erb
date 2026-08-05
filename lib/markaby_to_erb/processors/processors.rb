@@ -951,47 +951,31 @@
             # Already-converted inline raw HTML string
             arg
           elsif arg.is_a?(Parser::AST::Node) && arg.type == :hash
-            # Check if hash contains nested hashes (complex structure)
             has_nested_hash = arg.children.any? do |pair|
               pair.children[1] && pair.children[1].type == :hash
             end
-            
-            # Check if hash has string values with quotes (complex strings that need braces)
+
             has_quoted_strings = arg.children.any? do |pair|
               value = pair.children[1]
               value && value.type == :str && (value.children[0].include?("'") || value.children[0].include?('"'))
             end
-            
-            # Check if hash has only simple values (variables or simple strings without quotes)
+
             has_only_simple_values = arg.children.all? do |pair|
               value = pair.children[1]
-              if !value
-                true
-              elsif value.type == :str
-                # Simple string (no quotes in content)
-                !value.children[0].include?("'") && !value.children[0].include?('"')
-              else
-                # Variable or other non-string value
-                true
-              end
+              !value || value.type != :str || (!value.children[0].include?("'") && !value.children[0].include?('"'))
             end
-            
-            # Check if there are non-hash arguments before this hash
-            has_non_hash_before = args[0...index].any? { |a| !a.is_a?(Parser::AST::Node) || a.type != :hash }
-            
-            # Special case: select_tag expects no braces even with non-hash args before
+
+            has_non_hash_before = args[0...index].any? do |argument|
+              !argument.is_a?(Parser::AST::Node) || argument.type != :hash
+            end
             is_select_tag = method_name == :select_tag
-            
-            # For hash arguments, don't wrap in curly braces if:
-            # 1. It's the last argument
-            # 2. It's the only hash argument
-            # 3. It doesn't contain nested hashes
-            # 4. It doesn't have quoted strings (which need braces for clarity)
-            # 5. It has only simple values AND (there are no non-hash args before OR it's select_tag)
-            # Otherwise, keep the braces for clarity
             is_last = (index == args.length - 1)
-            # Keep braces if there are non-hash args before, unless it's select_tag
-            should_wrap = hash_count > 1 || !is_last || has_nested_hash || has_quoted_strings || (is_last && has_non_hash_before && (!has_only_simple_values || !is_select_tag))
+            should_wrap = hash_count > 1 || !is_last || has_nested_hash || has_quoted_strings ||
+                          (is_last && has_non_hash_before && (!has_only_simple_values || !is_select_tag))
+
+            # Rails' link_to_remote accepts one trailing options hash. Braces
+            # around that hash are redundant, including when :url is nested.
+            should_wrap = false if method_name == :link_to_remote && hash_count == 1 && is_last
             extract_content_for_hash(arg, should_wrap)
           elsif arg.is_a?(Parser::AST::Node) && [:str, :dstr].include?(arg.type)
             "\"#{extract_content(arg)}\""
@@ -1337,7 +1321,7 @@
       end
 
       def process_block(node)
-        method_call, args, body = node.children
+        method_call, block_args, body = node.children
         method_name = method_call.children[1]
 
         html_tag, classes, ids = extract_html_tag_and_attributes(node.children[0])
@@ -1386,7 +1370,7 @@
           else
             receiver_chain = extract_receiver_chain(receiver_node)
           end
-          receiver_args = extract_argument_recursive(args).join(',')
+          receiver_args = extract_argument_recursive(block_args).join(',')
 
           add_line("<% #{receiver_chain}.#{method_name} do |#{receiver_args}| %>", :process_block)
 
@@ -1417,12 +1401,12 @@
           # For helper methods or other method calls with blocks, use <% not <%=
           # The block itself doesn't output - the content inside does
           # Extract method call without parentheses to match existing ERB style
-          receiver, method_name_node, *args = method_call.children
+          receiver, method_name_node, *method_args = method_call.children
           receiver_str = receiver ? extract_content(receiver) : ''
           method_name_str = method_name_node.to_s
           
           # Extract arguments without parentheses (match existing ERB style)
-          arguments_str = args.map do |arg|
+          arguments_str = method_args.map do |arg|
             if arg.type == :hash
               # Don't wrap hash arguments in braces when in blocks
               extract_content_for_hash(arg, false)
@@ -1436,12 +1420,15 @@
                           else
                             "#{receiver_str}.#{method_name_str}"
                           end
+
+          block_arguments = extract_argument_recursive(block_args).join(', ')
+          block_suffix = block_arguments.empty? ? 'do' : "do |#{block_arguments}|"
           
           if arguments_str.empty?
-            erb_code = "<% #{method_call_str} do %>"
+            erb_code = "<% #{method_call_str} #{block_suffix} %>"
           else
             # No parentheses - matches existing ERB files like: ajax_form :url => {...}, :confirm_leave => :save do
-            erb_code = "<% #{method_call_str} #{arguments_str} do %>"
+            erb_code = "<% #{method_call_str} #{arguments_str} #{block_suffix} %>"
           end
           
           add_line(erb_code, :process_block)
